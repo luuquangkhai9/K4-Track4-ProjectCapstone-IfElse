@@ -4,12 +4,86 @@ from math import dist
 
 from config import DEFAULT_CONFIG as C
 from contracts import Action, ControllerState as State, HandSample, RobotCommand, SimStatus
-from control import Controller
+from control import Controller, extract_hand_features
+from dev.hand_samples import make_sample
 from dev.run_control import Harness, LocalSimulation
 from main import run
 
 
 class ControlTests(unittest.TestCase):
+    def test_early_resume_is_not_queued_through_tracking_flicker(self):
+        h = Harness()
+        h.tick(valid=False)
+        self.assertFalse(h.controller.request_resume())
+        # No new C press: even sustained valid tracking must remain paused.
+        h.frames(90)
+        self.assertEqual(h.controller.state, State.PAUSED)
+        self.assertTrue(h.controller._resume_ready)
+        self.assertTrue(h.controller.request_resume())
+        # A bad frame arriving on the C tick cancels that confirmation.
+        h.tick(valid=False)
+        h.frames(90)
+        self.assertEqual(h.controller.state, State.PAUSED)
+        self.assertFalse(h.controller._resume_requested)
+        self.assertTrue(h.controller.request_resume())
+        h.tick()
+        self.assertNotEqual(h.controller.state, State.PAUSED)
+
+    def test_repeated_resume_during_flicker_never_moves_or_releases_box(self):
+        h = Harness()
+        h.pick()
+        h.tick(valid=False)
+        for i in range(120):
+            h.controller.request_resume()
+            command = h.tick(valid=i % 6 != 0)
+            self.assertEqual(h.controller.state, State.PAUSED)
+            self.assertTrue(command.hold_position)
+            self.assertTrue(command.gripper_closed)
+            self.assertEqual(command.action, Action.NONE)
+        self.assertEqual(h.sim.held, "green")
+        self.assertEqual(h.sim.release_calls, 0)
+
+    def test_pause_reason_distinguishes_pose_loss_from_slow_frames(self):
+        h = Harness()
+        h.tick(valid=False)
+        self.assertEqual(h.controller.pause_reason, "wrist_not_matched")
+        sample = replace(make_sample(h.frame+1, h.now, h.now), pose_valid=False)
+        h.controller.update(sample, h.sim.status(), h.now)
+        self.assertEqual(h.controller.pause_reason, "pose_lost")
+        h.controller.update(sample, h.sim.status(), h.now+C.sample_max_age_s+.01)
+        self.assertEqual(h.controller.pause_reason, "sample_stale")
+
+    def test_scripted_input_respects_left_hand_selection(self):
+        from dev.scripted_vision import Vision
+        config = replace(C, hand_side="Left")
+        vision = Vision(config)
+        vision.start()
+        sample = vision.latest_sample()
+        self.assertEqual(sample.arm_side, "Left")
+        self.assertIsNotNone(extract_hand_features(sample, config))
+        self.assertIsNone(extract_hand_features(sample, C))
+
+    def test_partial_arm_wrong_side_and_mismatched_wrist_pause_while_holding(self):
+        for change in (dict(pose_valid=False), dict(hand_valid=False), dict(arm_side="Left"),
+                       dict(arm_keypoints={}), dict(hand_keypoints=()),
+                       dict(image_height=0)):
+            h = Harness()
+            h.pick()
+            sample = replace(make_sample(h.frame+1, h.now, h.now), **change)
+            command = h.controller.update(sample, h.sim.status(), h.now)
+            self.assertEqual(h.controller.state, State.PAUSED)
+            self.assertTrue(command.hold_position)
+            self.assertTrue(command.gripper_closed)
+            self.assertEqual(command.action, Action.NONE)
+        for joint in ("shoulder", "elbow", "wrist"):
+            sample = make_sample(1, 0, 0)
+            arm = dict(sample.arm_keypoints)
+            arm[joint] = (*arm[joint][:3], .1, 1)
+            self.assertIsNone(extract_hand_features(replace(sample, arm_keypoints=arm)))
+        sample = make_sample(1, 0, 0)
+        arm = dict(sample.arm_keypoints, wrist=(.1, .1, 0, 1, 1))
+        self.assertIsNone(extract_hand_features(replace(sample, arm_keypoints=arm)))
+
     def test_complete_cycle_once_and_rate_limit(self):
         h = Harness()
         h.pick()
@@ -72,6 +146,7 @@ class ControlTests(unittest.TestCase):
         command = h.tick(valid=False)
         self.assertEqual(command.target_xyz, actual)
         self.assertTrue(command.gripper_closed)
+        self.assertTrue(command.hold_position)
         h.frames(60, v=0.248)
         self.assertEqual(h.controller.state, State.PAUSED)
         self.assertEqual(h.sim.xyz, actual)
@@ -84,6 +159,42 @@ class ControlTests(unittest.TestCase):
         self.assertEqual(h.controller.state, State.CARRYING)
         self.assertEqual(h.sim.release_calls, 0)
 
+    def test_fresh_frame_after_tracking_gap_requires_explicit_resume(self):
+        h = Harness()
+        h.frames(120, v=0.752)
+        # No update sees an invalid frame: the producer resumes with fresh data
+        # after a stall, with a pinch that was not observed during the gap.
+        h.now += C.sample_max_age_s + .1
+        command = h.tick(v=0.752, ratio=.1)
+        self.assertEqual(h.controller.state, State.PAUSED)
+        self.assertTrue(command.hold_position)
+        h.frames(60, v=0.752)
+        self.assertEqual(h.controller.state, State.PAUSED)
+        self.assertEqual(h.sim.attach_calls, 0)
+        h.controller.request_resume()
+        command = h.tick(v=0.752)
+        # Already at transport height: recovery can finish lifting this tick.
+        self.assertEqual(h.controller.state, State.READY)
+        self.assertFalse(command.hold_position)
+
+    def test_frame_gap_cannot_confirm_pinch_even_if_consumer_keeps_ticking(self):
+        h = Harness()
+        h.frames(120, v=0.752)
+        h.tick(v=0.752, ratio=.1)
+        cached = make_sample(h.frame, h.now, h.now, True, .5, .752, .1)
+        status = h.sim.status()
+        for _ in range(14):
+            h.now += 1 / 60
+            h.controller.update(cached, status, h.now)
+        # Both the old and new samples are within their age limit when read;
+        # the inter-frame gap itself must invalidate the stability window.
+        h.now += .1
+        h.frame += 1
+        command = h.controller.update(make_sample(h.frame, h.now, h.now, True, .5, .752, .1), status, h.now)
+        self.assertEqual(h.controller.state, State.PAUSED)
+        self.assertEqual(command.action, Action.NONE)
+        self.assertTrue(command.hold_position)
+
     def test_resume_closed_hand_stays_paused(self):
         h = Harness()
         h.tick(valid=False)
@@ -94,7 +205,7 @@ class ControlTests(unittest.TestCase):
     def test_cached_and_stale_samples_do_not_arm(self):
         controller = Controller()
         status = SimStatus(C.home_xyz, True, "green")
-        sample = HandSample(1, 0, 0, True)
+        sample = make_sample(1, 0, 0, True)
         for now in (0, 0.1, 0.2):
             controller.update(sample, status, now)
         self.assertFalse(controller._armed)
@@ -104,9 +215,9 @@ class ControlTests(unittest.TestCase):
 
     def test_bad_samples_pause(self):
         status = SimStatus(C.home_xyz, True)
-        sample = HandSample(1, 1, 1, True)
-        for bad in (None, replace(sample, u=float("nan")), replace(sample, v=2),
-                    replace(sample, pinch_ratio=-1), replace(sample, processed_at=2),
+        sample = make_sample(1, 1, 1, True)
+        for bad in (None, replace(sample, image_width=0), replace(sample, hand_keypoints=()),
+                    replace(sample, pose_valid=False), replace(sample, processed_at=2),
                     replace(sample, captured_at=2), replace(sample, valid=False)):
             controller = Controller()
             controller.update(bad, status, 1)
@@ -129,7 +240,7 @@ class ControlTests(unittest.TestCase):
         for _ in range(150):
             h.now += 1 / 60
             h.frame += 1
-            sample = HandSample(h.frame, h.now, h.now, True, 0.5, 0.752, 0.1)
+            sample = make_sample(h.frame, h.now, h.now, True, 0.5, 0.752, 0.1)
             command = h.controller.update(sample, frozen, h.now)
             self.assertEqual(command.action, Action.NONE)
         self.assertEqual(h.controller.state, State.LOWERING_PICK)
@@ -165,7 +276,7 @@ class ControlTests(unittest.TestCase):
         for _ in range(600):
             h.now += 1 / 60
             h.frame += 1
-            h.controller.update(HandSample(h.frame, h.now, h.now, True, 0.5, 0.752, 0.1), status, h.now)
+            h.controller.update(make_sample(h.frame, h.now, h.now, True, 0.5, 0.752, 0.1), status, h.now)
         self.assertEqual(h.controller.state, State.PAUSED)
 
 
@@ -186,7 +297,7 @@ class LoopTests(unittest.TestCase):
                 pass
             def latest_sample(self):
                 self.frame += 1
-                return HandSample(self.frame, clock.now, clock.now, True, 0.5,
+                return make_sample(self.frame, clock.now, clock.now, True, 0.5,
                                   0.752 if clock.now < 5 else 0.248,
                                   0.8 if clock.now < 2 or clock.now >= 8 else 0.1)
             def close(self):
@@ -224,7 +335,7 @@ class LoopTests(unittest.TestCase):
                 pass
             def latest_sample(self):
                 self.frame += 1
-                return HandSample(self.frame, clock.now, clock.now, True)
+                return make_sample(self.frame, clock.now, clock.now, True)
             def poll_key(self):
                 return {5: "p", 40: "c", 70: "r", 100: "q"}.get(self.frame)
             def close(self):

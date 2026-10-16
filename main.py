@@ -7,7 +7,7 @@ import time
 
 from config import Config, DEFAULT_CONFIG
 from contracts import Event, RobotCommand, SimStatus
-from control import Controller
+from control import Controller, extract_hand_features
 
 
 def initial_status(simulation, result, config):
@@ -60,6 +60,18 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
                     if cv2 is None:
                         cv2 = importlib.import_module("cv2")
                     frame = frame.copy()
+                    if config.control_mode == "pick":
+                        overlay_sample = vision.latest_sample()
+                        features = extract_hand_features(overlay_sample, config)
+                        if features is not None:
+                            h, w = frame.shape[:2]
+                            cv2.circle(frame, (int(features.u*w), int(features.v*h)),
+                                       9, (0, 255, 255), 2)
+                        if overlay_sample is not None:
+                            age_ms = (clock() - overlay_sample.captured_at) * 1000
+                            processing_ms = (overlay_sample.processed_at - overlay_sample.captured_at) * 1000
+                            cv2.putText(frame, f"Frame age={age_ms:.0f}ms processing={processing_ms:.0f}ms",
+                                        (12, 76), cv2.FONT_HERSHEY_SIMPLEX, .45, (255, 255, 255), 1)
                     cv2.putText(frame, f"{controller.state.value}: {controller.message}",
                                 (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
                     cv2.putText(frame, f"candidate={status.candidate_box_id} held={status.held_box_id} "
@@ -99,6 +111,8 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
                 simulation.release()
             for event in controller.drain_events():
                 emit(event)
+                if event.event_type in ("paused", "resumed"):
+                    print(f"Controller {event.event_type}: {event.reason}")
             if metrics is not None and hasattr(metrics, "tick"):
                 metrics.tick(clock())
             if bridge is not None:

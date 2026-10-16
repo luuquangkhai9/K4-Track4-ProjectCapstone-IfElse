@@ -11,28 +11,151 @@ import urllib.error
 import urllib.request
 
 from config import DEFAULT_CONFIG as C
-from contracts import HandSample, RobotCommand, ControllerState as State
-from control import Controller
+from contracts import HandSample, RobotCommand, SimStatus, ControllerState as State
+from control import Controller, extract_hand_features
+from dev.hand_samples import make_sample
 from metrics import Metrics
 from simulation import Simulation
 from simulation.serve import IntegrationBridge
-from vision import sample_from_landmarks
+from vision import sample_from_landmarks, match_hand_to_arm
 
 
 class VisionGeometryTests(unittest.TestCase):
+    @staticmethod
+    def arm(points):
+        wrist = points[0] if points else (.5, .7, 0)
+        return {"shoulder": (.5, .2, 0, 1, 1), "elbow": (.5, .4, 0, 1, 1),
+                "wrist": (*wrist, 1, 1)}
+
     def test_pixel_aspect_ratio_and_palm_center(self):
         points = [(.5, .5, 0)] * 21
         points[0] = (.5, .7, 0)
         points[4], points[8] = (.4, .5, 0), (.45, .5, 0)
-        sample = sample_from_landmarks(points, 640, 480, 1, 1, 1.01)
+        sample = sample_from_landmarks(points, self.arm(points), 640, 480, 1, 1, 1.01)
         self.assertTrue(sample.valid)
-        self.assertAlmostEqual(sample.pinch_ratio, 32 / 96)
-        self.assertAlmostEqual(sample.u, .5)
-        self.assertAlmostEqual(sample.v, .54)
+        features = extract_hand_features(sample)
+        self.assertAlmostEqual(features.pinch_ratio, 32 / 96)
+        self.assertAlmostEqual(features.u, .5)
+        self.assertAlmostEqual(features.v, .54)
 
     def test_missing_tiny_or_nonfinite_hand_is_invalid(self):
         for points in ([], [(.5, .5, 0)] * 21, [(float("nan"), .5, 0)] * 21):
-            self.assertFalse(sample_from_landmarks(points, 640, 480, 1, 1, 1).valid)
+            self.assertIsNone(extract_hand_features(sample_from_landmarks(points, self.arm(points), 640, 480, 1, 1, 1)))
+
+    def test_partial_or_malformed_landmarks_do_not_control_robot(self):
+        points = [(.5, .5, 0)] * 21
+        points[0] = (.5, .7, 0)
+        for invalid_tip in ((1.2, .5, 0), (.5, -.1, 0), (.5, .5, float("nan")), (.5,)):
+            points[8] = invalid_tip
+            self.assertIsNone(extract_hand_features(sample_from_landmarks(points, self.arm(points), 640, 480, 1, 1, 1)))
+
+    def test_raw_contract_distinguishes_missing_pose_hand_and_pairing(self):
+        sample = make_sample(1, 1, 1)
+        args = (640, 480, 1, 1, 1)
+        no_pose = sample_from_landmarks(sample.hand_keypoints, {}, *args)
+        self.assertFalse(no_pose.valid)
+        self.assertTrue(no_pose.hand_valid)
+        self.assertFalse(no_pose.pose_valid)
+        no_hand = sample_from_landmarks([], sample.arm_keypoints, *args)
+        self.assertFalse(no_hand.valid)
+        self.assertTrue(no_hand.pose_valid)
+        self.assertFalse(no_hand.hand_valid)
+        arm = dict(sample.arm_keypoints, wrist=(.1, .1, 0, 1, 1))
+        mismatched = sample_from_landmarks(sample.hand_keypoints, arm, *args)
+        self.assertFalse(mismatched.valid)
+        self.assertTrue(mismatched.pose_valid and mismatched.hand_valid)
+
+    def test_selected_hand_missing_never_falls_back_to_other_arm(self):
+        from types import SimpleNamespace as NS
+        sample = make_sample(1, 1, 1)
+        other_hand = [NS(x=.05, y=.05, z=0)] * 21
+        self.assertEqual(match_hand_to_arm([other_hand], sample.arm_keypoints, 640, 480), [])
+        selected_hand = [NS(x=x, y=y, z=z) for x, y, z in sample.hand_keypoints]
+        self.assertEqual(match_hand_to_arm([selected_hand], {}, 640, 480), [])
+        self.assertEqual(match_hand_to_arm([], sample.arm_keypoints, 640, 480), [])
+        for hands in ([other_hand, selected_hand], [selected_hand, other_hand]):
+            self.assertEqual(tuple(match_hand_to_arm(hands, sample.arm_keypoints, 640, 480)),
+                             sample.hand_keypoints)
+
+    def test_pose_confidence_hysteresis_keeps_fresh_elbow_jitter_but_rejects_loss(self):
+        raw = make_sample(1, 0, 0, u=.7)
+        tracked = False
+        controller = Controller()
+        for i in range(60):
+            quality = .6 if i % 2 == 0 else .48
+            arm = dict(raw.arm_keypoints, elbow=(*raw.arm_keypoints["elbow"][:3], quality, .99))
+            sample = sample_from_landmarks(raw.hand_keypoints, arm, 640, 480,
+                                          i, i/60, i/60, pose_tracked=tracked)
+            tracked = sample.pose_valid
+            self.assertTrue(sample.valid)
+            command = controller.update(sample, SimStatus(C.home_xyz, True), i/60)
+            self.assertFalse(command.hold_position)
+        self.assertGreater(command.target_xyz[0], C.home_xyz[0]+.05)
+        # Actual occlusion or disappearance breaks the latch immediately.
+        for arm in ({}, dict(raw.arm_keypoints, elbow=(.5, .5, 0, .1, .99)),
+                    dict(raw.arm_keypoints, elbow=(float("nan"), .5, 0, .9, .99)),
+                    dict(raw.arm_keypoints, elbow=(1.2, .5, 0, .9, .99))):
+            sample = sample_from_landmarks(raw.hand_keypoints, arm, 640, 480,
+                                          61, 61/60, 61/60, pose_tracked=True)
+            self.assertFalse(sample.pose_valid)
+            command = controller.update(sample, SimStatus(C.home_xyz, True), 61/60)
+            self.assertTrue(command.hold_position)
+        moderate = dict(raw.arm_keypoints, elbow=(.5, .5, 0, .48, .99))
+        sample = sample_from_landmarks(raw.hand_keypoints, moderate, 640, 480, 62, 2, 2)
+        self.assertFalse(sample.valid)  # Must reacquire, not resume at the retain floor.
+
+    @unittest.skipUnless(importlib.util.find_spec("mediapipe"), "Install vision runtime")
+    def test_inference_pairs_selected_side_on_the_same_frame_and_timestamp(self):
+        import numpy as np
+        from types import SimpleNamespace as NS
+        from unittest.mock import Mock
+        from vision import Vision
+        for side, indices in (("Right", (11, 13, 15)), ("Left", (12, 14, 16))):
+            config = replace(C, hand_side=side)
+            raw = make_sample(1, 1, 1, u=.7, v=.65, side=side)
+            pose = [NS(x=.05, y=.05, z=0, visibility=1, presence=1) for _ in range(33)]
+            for index, name in zip(indices, ("shoulder", "elbow", "wrist")):
+                x, y, z, visibility, presence = raw.arm_keypoints[name]
+                pose[index] = NS(x=x, y=y, z=z, visibility=visibility, presence=presence)
+            points = [NS(x=x, y=y, z=z) for x, y, z in raw.hand_keypoints]
+            wrong = [NS(x=.05, y=.05, z=0)] * 21
+            vision = Vision(config)
+            vision._pose_model = Mock()
+            vision._pose_model.detect_for_video.return_value = NS(pose_landmarks=[pose])
+            vision._model = Mock()
+            vision._model.detect_for_video.return_value = NS(
+                hand_landmarks=[wrong, points],
+                # Reproduce the webcam failure: the matching hand has the
+                # opposite label; filtering by category picks the other arm.
+                handedness=[[NS(category_name=side)],
+                            [NS(category_name="Left" if side == "Right" else "Right")]])
+            sample, _ = vision._infer(np.zeros((480, 640, 3), dtype=np.uint8), 1, 1, 1000)
+            self.assertTrue(sample.valid)
+            self.assertEqual(sample.arm_side, side)
+            self.assertEqual(sample.hand_keypoints, raw.hand_keypoints)
+            pose_args = vision._pose_model.detect_for_video.call_args.args
+            hand_args = vision._model.detect_for_video.call_args.args
+            self.assertIs(pose_args[0], hand_args[0])
+            self.assertEqual(pose_args[1], hand_args[1])
+            controller = Controller(config)
+            for i in range(1, 61):
+                now = i / 60
+                command = controller.update(replace(sample, frame_id=i, captured_at=now,
+                                                    processed_at=now), SimStatus(C.home_xyz, True), now)
+            self.assertEqual(controller.state, State.READY)
+            self.assertFalse(command.hold_position)
+            self.assertGreater(command.target_xyz[0], C.home_xyz[0] + .05)
+            self.assertLess(command.target_xyz[1], C.home_xyz[1] - .05)
+            # Check the actual Vision latch, including reset after a frame gap.
+            elbow = pose[indices[1]]
+            for frame_id, captured, quality, expected in (
+                    (2, 1.03, .48, True), (3, 1.06, .2, False),
+                    (4, 1.09, .48, False), (5, 1.12, .8, True),
+                    (6, 2.0, .48, False)):
+                elbow.visibility = quality
+                current, _ = vision._infer(np.zeros((480, 640, 3), dtype=np.uint8),
+                                           frame_id, captured, int(captured*1000))
+                self.assertEqual(current.pose_valid, expected)
 
     @unittest.skipUnless(importlib.util.find_spec("mediapipe") and Path("models/hand_landmarker.task").is_file(),
                          "Install MediaPipe and download the model for the worker smoke test")
@@ -132,7 +255,7 @@ class PhysicsTests(unittest.TestCase):
             self.frame += 1
             u = .15 + (x - .35) / .30 * .7
             v = .15 + (.25 - y) / .5 * .7
-            sample = HandSample(self.frame, self.now, self.now, valid, u, v, ratio)
+            sample = make_sample(self.frame, self.now, self.now, valid, u, v, ratio)
             command = self.controller.update(sample, self.sim.status(), self.now)
             self.sim.step(command, 1 / 60)
             if command.action.value == "ATTACH":
@@ -169,6 +292,35 @@ class PhysicsTests(unittest.TestCase):
         self.assertIsNone(self.sim.held)
         self.assertEqual(self.sim.p.getNumConstraints(), 0)
         self.assertFalse(self.sim.placed)
+
+    def test_box_never_grasped_and_released_is_not_a_success(self):
+        self.sim.p.resetBasePositionAndOrientation(self.sim.boxes["green"],
+                                                   (*C.bin_center, .04), (0, 0, 0, 1))
+        for _ in range(120):
+            self.sim.step(RobotCommand(C.home_xyz, False), 1 / 60)
+        self.assertNotIn("green", self.sim.status().placed_box_ids)
+
+    def test_pause_latches_joints_instead_of_resolving_ik(self):
+        self.frames(120)
+        self.frames(180, ratio=.1)
+        command = self.controller.update(None, self.sim.status(), self.now + .01)
+        self.assertTrue(command.hold_position)
+        self.sim.step(command, 1 / 60)
+        captured = tuple(self.sim._hold_joints)
+        for _ in range(120):
+            self.sim.step(command, 1 / 60)
+        self.assertEqual(tuple(self.sim._hold_joints), captured)
+        actual = [self.sim.p.getJointState(self.sim.robot, i)[0] for i in range(7)]
+        self.assertLess(max(abs(a-b) for a, b in zip(actual, captured)), .005)
+        self.assertEqual(self.sim.status().held_box_id, "green")
+        self.sim.reset()
+        self.assertIsNone(self.sim._hold_joints)
+
+    def test_standalone_simulation_runner_uses_real_feedback(self):
+        from dev.run_simulation import run_sequence
+        status = run_sequence(self.sim, self.sim.config, "blue", realtime=False)
+        self.assertEqual(status.placed_box_ids, frozenset({"blue"}))
+        self.assertIsNone(status.held_box_id)
 
     def test_ik_reaches_workspace_corners_and_pick_bin_heights(self):
         points = [(x, y, C.transport_z) for x in C.workspace_x for y in C.workspace_y]

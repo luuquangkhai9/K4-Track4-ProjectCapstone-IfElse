@@ -10,12 +10,35 @@ Nội dung gồm hướng đề tài gợi ý, bốn yêu cầu của mỗi demo
 
 ```powershell
 ./setup-demo.ps1
-./run-demo.ps1 --web
+./run-demo.ps1 --mode pick --web
 ```
 
 Xem `README_DEMO.md` để cài runtime, điều khiển webcam, pause/reset, ghi lượt đo
 và chạy kiểm thử. Webcam → `vision.py` → controller TV1 → PyBullet trong
 `simulation/`; cảnh Three.js hiển thị trạng thái vật lý thực. Có cả log JSONL/CSV.
+
+MVP trong `HACKATHON_PLAN.md` dùng chế độ `pick`: Pose Lite + Hand Landmarker
+nhận đủ vai–khuỷu–cổ tay và 21 điểm bàn tay trên cùng frame. Một tay điều khiển X–Y,
+chụm để gắp hộp được tô sáng, mở trong giỏ để tự hạ/thả. Mất tracking hoặc
+gián đoạn frame quá lâu sẽ PAUSED, giữ khớp và hộp; mở tay ổn định ít nhất 0,75 giây, chờ dòng `Tracking stable: tap C once to resume`
+rồi nhấn C một lần để tiếp tục. C nhấn trước khi tracking ổn định không được lưu chờ. P dừng, R reset, Q thoát.
+
+Runner độc lập cho ba phần TV1–TV3 (không cần logger TV4):
+
+```powershell
+.runtime/python/python.exe -m dev.run_control
+.runtime/python/python.exe -m dev.run_vision
+.runtime/python/python.exe -m dev.run_simulation --box green
+```
+
+Tải/cập nhật đủ hai model bằng `.runtime/python/python.exe -m dev.download_model`
+(nếu runtime đã cài từ trước). Runner vision hiển thị webcam/landmark và in
+`HandSample` chứa keypoints thô. Cần nhìn thấy cả vai, khuỷu và bàn tay đã chọn;
+che riêng vai/khuỷu hoặc bàn tay đều gây PAUSED. Overlay hiển thị riêng trạng thái
+pose, hand và kết quả ghép cổ tay. `--hand Left` chọn tay trái. Runner simulation dùng
+chuỗi lệnh cố định, chờ phản hồi gắp/thả thật từ PyBullet rồi in PASS; thêm
+`--headless` để kiểm tra không mở GUI. Chạy tích hợp với `--no-log` nếu chỉ cần
+phần TV1–TV3. Đầu vào tổng hợp không thay thế kiểm thử người dùng với webcam.
 
 Nhận diện cả vai–khuỷu–cổ tay và cho robot di chuyển theo cánh tay:
 

@@ -7,8 +7,9 @@ small local stub with dev.fakes later without changing Controller or main.run.
 from math import dist
 
 from config import DEFAULT_CONFIG
-from contracts import HandSample, SimStatus
+from contracts import SimStatus
 from control import Controller
+from dev.hand_samples import make_sample
 
 
 class LocalSimulation:
@@ -78,7 +79,7 @@ class Harness:
     def tick(self, u=0.5, v=0.5, ratio=0.8, valid=True):
         self.now += 1 / 60
         self.frame += 1
-        sample = HandSample(self.frame, self.now, self.now, valid, u, v, ratio)
+        sample = make_sample(self.frame, self.now, self.now, valid, u, v, ratio)
         command = self.controller.update(sample, self.sim.status(), self.now)
         self.sim.step(command, 1 / 60)
         if command.action.value == "ATTACH":

@@ -30,7 +30,11 @@ class Simulation:
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(1 / 240)
         p.setPhysicsEngineParameter(numSolverIterations=100)
-        p.loadURDF("plane.urdf")
+        p.loadURDF("plane.urdf", basePosition=(0, 0, -.45))
+        # Work surface stays at Z=0, preserving the shared pick/bin heights.
+        self._static_box((.48, .38, .02), (.38, 0, -.02), (.32, .35, .39, 1))
+        # Stopped conveyor at the pick station (no autonomous belt motion).
+        self._static_box((.19, .06, .005), (.5, -.18, -.005), (.10, .12, .15, 1))
         self.robot = p.loadURDF("franka_panda/panda.urdf", useFixedBase=True)
         self.ee_link = 11
         self.orientation = p.getQuaternionFromEuler(c.downward_euler)
@@ -64,6 +68,8 @@ class Simulation:
         ):
             self._static_box(extent, position)
         self.constraint = self.held = None
+        self._hold_joints = None
+        self._released = set()
         self.placed = set()
         self._settled_since = {}
         self._time = self._remainder = 0.0
@@ -74,17 +80,21 @@ class Simulation:
         self._highlighted = None
         return self.status()
 
-    def _static_box(self, extent, position):
+    def _static_box(self, extent, position, color=(.2, .6, .6, 1)):
         p = self.p
         shape = p.createCollisionShape(p.GEOM_BOX, halfExtents=extent)
-        visual = p.createVisualShape(p.GEOM_BOX, halfExtents=extent, rgbaColor=(.2, .6, .6, 1))
+        visual = p.createVisualShape(p.GEOM_BOX, halfExtents=extent, rgbaColor=color)
         p.createMultiBody(0, shape, visual, position)
 
     def _drive(self, command, dt=.05):
         p = self.p
         self.target = command.target_xyz
+        if not command.hold_position:
+            self._hold_joints = None
         if command.hold_position:
-            joints = [p.getJointState(self.robot, i)[0] for i in range(7)]
+            if self._hold_joints is None:
+                self._hold_joints = [p.getJointState(self.robot, i)[0] for i in range(7)]
+            joints = self._hold_joints
         elif command.elbow_xyz is not None:
             joints = p.calculateInverseKinematics2(self.robot, [3, self.ee_link],
                                                    [command.elbow_xyz, self.target],
@@ -165,6 +175,7 @@ class Simulation:
     def release(self):
         if self.constraint is not None:
             self.p.removeConstraint(self.constraint)
+            self._released.add(self.held)
         self.constraint = self.held = None
 
     def _check_placed(self):
@@ -176,7 +187,7 @@ class Simulation:
             inside = all(c.bin_center[i] - c.bin_half_size[i] + .005 <= aabb[0][i]
                          and aabb[1][i] <= c.bin_center[i] + c.bin_half_size[i] - .005
                          for i in (0, 1))
-            settled = (box_id != self.held and inside and .015 <= xyz[2] <= .07
+            settled = (box_id in self._released and box_id != self.held and inside and .015 <= xyz[2] <= .07
                        and dist(velocity, (0, 0, 0)) < .03
                        and dist(angular, (0, 0, 0)) < .1)
             if settled:

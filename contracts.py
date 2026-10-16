@@ -1,6 +1,6 @@
 """Shared module contracts. This module deliberately uses only the stdlib."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 Vec3 = tuple[float, float, float]
@@ -30,9 +30,15 @@ class HandSample:
     captured_at: float
     processed_at: float
     valid: bool
-    u: float = 0.5
-    v: float = 0.5
-    pinch_ratio: float = 1.0
+    arm_side: str = "Right"
+    # Mirrored normalized image coordinates, never world coordinates.
+    # Arm values: x, y, z, visibility, presence; hand values: x, y, z.
+    arm_keypoints: dict[str, tuple[float, ...]] = field(default_factory=dict)
+    hand_keypoints: tuple[Vec3, ...] = ()
+    pose_valid: bool = False
+    hand_valid: bool = False
+    image_width: int = 0
+    image_height: int = 0
 
 
 @dataclass(frozen=True)

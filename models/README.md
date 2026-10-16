@@ -1,9 +1,12 @@
-# Hand Landmarker pretrained
+# Pose Lite + Hand Landmarker pretrained
 
-Chạy `python -m dev.download_model` để lấy `hand_landmarker.task` từ Google:
+Chạy `python -m dev.download_model` để tải đủ hai model chính thức:
 
-https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+- `hand_landmarker.task`: https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+- `pose_landmarker_lite.task`: https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task
 
-Tài liệu API: https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker/python
+Model được Git ignore; chương trình không tự tải khi chạy demo. Script tải bỏ qua
+file đã tồn tại. `config.py` quy định đường dẫn của cả hai model.
 
-File model được Git ignore; chương trình không tự tải khi đang chạy demo.
+Tài liệu: [Hand Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker/python),
+[Pose Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/python).

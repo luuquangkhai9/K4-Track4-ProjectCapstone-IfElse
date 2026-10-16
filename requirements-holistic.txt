@@ -1,0 +1,4 @@
+mediapipe==0.10.14
+opencv-python
+numpy<2
+pybullet

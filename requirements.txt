@@ -1,0 +1,6 @@
+torch
+torchvision
+opencv-python
+numpy<2
+mediapipe==0.10.14
+pybullet

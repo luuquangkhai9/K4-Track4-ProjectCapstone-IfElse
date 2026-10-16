@@ -1,0 +1,53 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Holistic + Sim (webcam)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/run_holistic.py",
+      "args": ["--sim"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Holistic chi tracking (khong sim)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/run_holistic.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Holistic + Sim (video.mp4)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/run_holistic.py",
+      "args": ["--source", "video.mp4", "--sim"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Holistic nhe (complexity 0)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/run_holistic.py",
+      "args": ["--sim", "--complexity", "0"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Train CMU Hand (sua duong dan --root)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/train_hand.py",
+      "args": ["--root", "D:/datasets/hand_labels", "--epochs", "60"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "CMU model + Pose + Sim",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/run_pipeline.py",
+      "args": ["--weights", "hand_net.pt", "--sim"],
+      "console": "integratedTerminal"
+    }
+  ]
+}

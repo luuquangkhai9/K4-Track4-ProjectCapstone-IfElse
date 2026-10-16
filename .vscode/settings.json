@@ -1,0 +1,6 @@
+{
+  "python.terminal.activateEnvironment": true,
+  "terminal.integrated.env.windows": {
+    "PYTHONUTF8": "1"
+  }
+}

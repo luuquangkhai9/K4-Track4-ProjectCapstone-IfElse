@@ -50,6 +50,15 @@ class Config:
     simulation_gui: bool = True
     grasp_offset: float = 0.05
     candidate_distance: float = 0.04
+    control_mode: str = "pick"
+    arm_visibility: float = 0.65
+    arm_calibration_s: float = 0.6
+    arm_gain: float = 0.55
+    arm_workspace_x: tuple[float, float] = (0.20, 0.65)
+    arm_workspace_y: tuple[float, float] = (-0.35, 0.35)
+    arm_workspace_z: tuple[float, float] = (0.18, 0.65)
+    arm_reach: float = 0.70
+    arm_joint_speed: float = 1.2
 
     def __post_init__(self):
         if not 0 <= self.pinch_close < self.pinch_open:

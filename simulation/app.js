@@ -215,6 +215,14 @@
   var targetBeam = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(0, .04, 0), new T.Vector3(0, 1, 0)]), new T.LineBasicMaterial({ color: 0x6ce1d0, transparent: true, opacity: .35 }));
   targetBeam.frustumCulled = false; world.add(targetBeam);
   var lightBase = new T.PointLight(0x62dbc8, 1.7, 2.5, 2); arm.add(lightBase); lightBase.position.set(0, 1.5, .15);
+  var physicsArm = new T.Group(), physicsSegments = [], physicsJoints = [];
+  world.add(physicsArm); physicsArm.visible = false;
+  for (var segmentIndex = 0; segmentIndex < 8; segmentIndex++) {
+    var segment = new T.Mesh(new T.CylinderGeometry(.10, .13, 1, 14), mats.arm);
+    physicsArm.add(segment); physicsSegments.push(segment);
+    var joint = new T.Mesh(new T.SphereGeometry(.15, 14, 10), mats.armDark);
+    physicsArm.add(joint); physicsJoints.push(joint);
+  }
 
   // Simple labels and a virtual camera marker reinforce the perception-to-actuation flow.
   var camRig = new T.Group(); world.add(camRig); camRig.position.set(-3.95, 2.38, 1.1);
@@ -259,9 +267,10 @@
   }
 
   function updateTelemetry() {
-    $("coord-x").innerHTML = currentTarget.x.toFixed(2) + " <small>m</small>";
-    $("coord-y").innerHTML = currentTarget.y.toFixed(2) + " <small>m</small>";
-    $("coord-z").innerHTML = currentTarget.z.toFixed(2) + " <small>m</small>";
+    var xyz = integratedState ? integratedState.ee_xyz : [currentTarget.x, currentTarget.y, currentTarget.z];
+    $("coord-x").innerHTML = xyz[0].toFixed(2) + " <small>m</small>";
+    $("coord-y").innerHTML = xyz[1].toFixed(2) + " <small>m</small>";
+    $("coord-z").innerHTML = xyz[2].toFixed(2) + " <small>m</small>";
     var closed = currentGrip > .55;
     $("grip-state").textContent = closed ? "ĐÓNG" : "MỞ";
     $("grip-led").classList.toggle("closed", closed);
@@ -387,13 +396,24 @@
       if (!response.ok) throw new Error("state unavailable");
       var body = await response.json();
       if (body.active && body.ready) {
+        if (!integratedState) {
+          focus.set(-.6, 1.9, -.1);
+          view.distance = 14;
+          renderer.toneMappingExposure = .8;
+          keyLight.intensity = 1.4;
+          fillLight.intensity = .6;
+        }
         if (!integratedState || body.revision !== integratedState.revision) integratedReceivedAt = performance.now();
         integratedState = body;
         stopDemo();
         $("demo-button").disabled = true;
         $("integration-controls").hidden = false;
         document.body.classList.add("integrated");
-        document.querySelector(".intro").textContent = "Trạng thái thực từ PyBullet. Điều khiển bằng tay trong webcam; cảnh này chỉ hiển thị kết quả.";
+        var armMode = body.control_mode === "arm";
+        $("demo-button").style.display = armMode ? "none" : "";
+        document.querySelector("h1").textContent = armMode ? "Robot theo cánh tay" : "Gắp và phân loại";
+        document.querySelector(".intro").textContent = armMode ? "Đưa vai, khuỷu và cổ tay vào webcam. Giữ yên, nhấn C để hiệu chuẩn, rồi di chuyển cánh tay." : "Trạng thái thực từ PyBullet. Điều khiển bằng tay trong webcam; cảnh này chỉ hiển thị kết quả.";
+        document.querySelector('[data-input="t"]').style.display = armMode ? "none" : "";
       }
     } catch (_) { /* Keep the last physics frame, never simulate missing feedback. */ }
     window.setTimeout(pollState, 50);
@@ -429,10 +449,22 @@
     basket.position.set(bin.x, .66 - .19 * .36 / bh, bin.z);
     basketCount = state.placed_box_ids.length;
     solveArm();
+    if (state.robot_links && state.robot_links.length === 9) {
+      // Draw the actual Panda link endpoints, including the measured elbow.
+      // The original decorative two-link IK must not invent a different posture.
+      arm.visible = false;
+      physicsArm.visible = true;
+      state.robot_links.slice(1).forEach(function (point, i) {
+        var a = physicsPoint(state.robot_links[i]), b = physicsPoint(point);
+        physicsSegments[i].visible = a.distanceTo(b) > .001;
+        if (physicsSegments[i].visible) setSegment(physicsSegments[i], a, b);
+        physicsJoints[i].position.copy(b);
+      });
+    }
     var stale = performance.now() - integratedReceivedAt > 750;
     $("connection").textContent = stale ? "PHYSICS NGOẠI TUYẾN" : "PYBULLET LIVE · " + (state.source === "synthetic" ? "TAY GIẢ LẬP" : "WEBCAM");
     document.querySelector(".live-dot").classList.toggle("offline", stale);
-    updateStatus(state.controller_state, (state.vision_error || state.message) + " | placed=" + basketCount, !stale);
+    updateStatus(state.controller_state, (state.vision_error || state.message) + (state.control_mode === "arm" ? "" : " | placed=" + basketCount), !stale);
     $("state-tag").textContent = stale ? "STALE" : state.controller_state;
   }
 

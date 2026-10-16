@@ -80,10 +80,24 @@ class Simulation:
         visual = p.createVisualShape(p.GEOM_BOX, halfExtents=extent, rgbaColor=(.2, .6, .6, 1))
         p.createMultiBody(0, shape, visual, position)
 
-    def _drive(self, command):
+    def _drive(self, command, dt=.05):
         p = self.p
         self.target = command.target_xyz
-        joints = p.calculateInverseKinematics(self.robot, self.ee_link, self.target,
+        if command.hold_position:
+            joints = [p.getJointState(self.robot, i)[0] for i in range(7)]
+        elif command.elbow_xyz is not None:
+            joints = p.calculateInverseKinematics2(self.robot, [3, self.ee_link],
+                                                   [command.elbow_xyz, self.target],
+                                                   maxNumIterations=100, residualThreshold=1e-4)
+            limited = []
+            for i, value in enumerate(joints[:7]):
+                info = p.getJointInfo(self.robot, i)
+                actual = p.getJointState(self.robot, i)[0]
+                cap = self.config.arm_joint_speed * max(0, dt)
+                limited.append(max(info[8], min(info[9], max(actual-cap, min(actual+cap, value)))))
+            joints = limited
+        else:
+            joints = p.calculateInverseKinematics(self.robot, self.ee_link, self.target,
                                               self.orientation, maxNumIterations=100,
                                               residualThreshold=1e-5)
         p.setJointMotorControlArray(self.robot, list(range(7)), p.POSITION_CONTROL,
@@ -96,7 +110,7 @@ class Simulation:
     def step(self, command, dt):
         if dt < 0:
             raise ValueError("dt must be nonnegative")
-        self._drive(command)
+        self._drive(command, min(dt, self.config.max_control_dt))
         self._remainder += min(dt, self.config.max_control_dt)
         while self._remainder + 1e-12 >= 1 / 240:
             self.p.stepSimulation()
@@ -122,7 +136,10 @@ class Simulation:
                 self.p.changeVisualShape(self.boxes[box_id], -1, rgbaColor=(*color, 1))
             self._highlighted = candidate
         return SimStatus(ee, dist(ee, self.target) <= self.config.position_tolerance,
-                         candidate, self.held, frozenset(self.placed))
+                         candidate, self.held, frozenset(self.placed), self._elbow())
+
+    def _elbow(self):
+        return tuple(self.p.getLinkState(self.robot, 3, computeForwardKinematics=True)[4])
 
     def try_attach(self, box_id):
         if self.held is not None:
@@ -172,6 +189,9 @@ class Simulation:
     def snapshot(self):
         status = self.status()
         return {"ee_xyz": status.ee_xyz, "target_xyz": self.target,
+                "robot_links": [(0,0,0)] + [self.p.getLinkState(self.robot, i, computeForwardKinematics=True)[4]
+                                           for i in range(7)] + [status.ee_xyz],
+                "elbow_xyz": status.elbow_xyz,
                 "candidate_box_id": status.candidate_box_id, "held_box_id": self.held,
                 "placed_box_ids": sorted(self.placed),
                 "boxes": {key: self.p.getBasePositionAndOrientation(body)[0]

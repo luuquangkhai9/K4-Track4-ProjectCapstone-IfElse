@@ -1,5 +1,60 @@
 # Demo tích hợp — điều khiển robot gắp hàng bằng tay
 
+## Robot đi theo cánh tay
+
+Chế độ mới nhận cả **vai–khuỷu–cổ tay**, vẽ cánh tay và landmark bàn tay trên webcam,
+đồng thời điều khiển khuỷu và đầu robot trong không gian XYZ:
+
+```powershell
+./run-demo.ps1 --mode arm --web
+```
+
+`--headless` dùng cảnh web thay GUI PyBullet; `--hand Left` chọn cánh tay trái,
+mặc định Right. Giữ toàn bộ cánh tay được chọn trong ảnh, tránh che khuỷu/cổ tay.
+
+1. Đứng/ngồi để webcam thấy phần thân trên cùng vai, khuỷu, cổ tay.
+2. Giữ một tư thế thoải mái, nhấn **C**. Giữ yên khoảng 0.6 giây để hiệu chuẩn.
+   Nếu tay còn di chuyển, cửa sổ hiệu chuẩn bắt đầu lại.
+3. Khi thấy **FOLLOWING**, nâng/hạ, đưa ngang hoặc co/duỗi cánh tay.
+   Robot đi theo chuyển động tương đối của cổ tay và khuỷu so với vai.
+4. **P** dừng; **C** sau pause sẽ hiệu chuẩn lại ngay tại vị trí robot đang giữ,
+   nên không chạy lại mục tiêu trước khi mất tracking. **R** reset rồi hiệu chuẩn lại;
+   **Q**/Escape thoát. Các nút tương ứng cũng có trong cảnh web.
+
+`arm_vision.py` dùng MediaPipe Holistic của luồng TV2 với vòng đời worker tích hợp;
+không cần tải model ngoài mới. Chỉ cánh tay được chọn điều khiển, tay còn lại được
+vẽ xám. Landmark bàn tay có thể mất trong khi cánh tay vẫn được theo dõi; điều này
+không làm ngắt điều khiển cánh tay nếu vai/khuỷu/cổ tay còn hợp lệ.
+
+`arm_control.py` chuẩn hóa chiều dài cánh tay và trừ vị trí vai; dịch cả người hoặc
+thay đổi tỉ lệ quan sát không trực tiếp thành lệnh dịch robot. Camera x phải → robot
+Y, y lên → robot Z, z hướng về camera → robot X. Chuyển động trong ảnh gương được
+đổi theo cùng quy ước này cho cả hai tay. `arm_gain` mặc định 0.55 m cho một đơn vị
+chiều dài tay chuẩn hóa; chỉnh trong `config.py` để tăng/giảm độ nhạy.
+
+Robot Panda có cấu trúc khác tay người. Bộ IK nhiều điểm dùng đích khuỷu (link 3)
+và cổ tay/đầu gắp (link 11) để tìm tư thế gần nhất; **không bảo đảm sao chép mọi
+góc khớp 1:1 hoặc tới chính xác đồng thời cả hai điểm**. Snapshot Three.js vẽ các
+khớp thực của Panda từ PyBullet, không dựng một tư thế khuỷu riêng trong trình duyệt.
+Độ sâu là ước lượng tương đối từ webcam, không phải khoảng cách đo chính xác.
+
+Chế độ arm giới hạn workspace XYZ, bán kính với tới, tốc độ mục tiêu và tốc độ khớp.
+Mất hoặc landmark quá yếu, dữ liệu cũ/sai sẽ PAUSED và giữ vị trí khớp thực. Không
+tự phục hồi chuyển động. Chế độ này phục vụ theo cánh tay, không tự thực hiện chu
+trình gắp/thả; chọn `--mode pick` (mặc định) để dùng chu trình gắp hàng đã có.
+Nút bắt đầu lượt đo gắp được ẩn trong chế độ arm.
+
+Kiểm tra không cần webcam bằng chuyển động cánh tay tổng hợp:
+
+```powershell
+./run-demo.ps1 --mode arm --demo --headless --web
+```
+
+Chạy với vật lý thật, đánh dấu TAY GIẢ LẬP và ghi `results/synthetic/`. Kiểm thử gồm
+retarget khuỷu/cổ tay, giới hạn tốc độ, hiệu chuẩn, không điều khiển bằng chuyển động
+toàn thân đơn thuần, mất tracking, suy luận Holistic thật và phản hồi robot thật.
+Chất lượng bám với cánh tay người vẫn cần người vận hành thử trong điều kiện webcam.
+
 ## Cài và chạy trên Windows
 
 Tại thư mục gốc repo, PowerShell:

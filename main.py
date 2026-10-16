@@ -28,7 +28,11 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
     Event payloads passed to metrics.record_event are plain JSON-safe dicts.
     Trial lifecycle/TrialRecord persistence remain the responsibility of TV4.
     """
-    controller = Controller(config)
+    if config.control_mode == "arm":
+        from arm_control import ArmController
+        controller = ArmController(config)
+    else:
+        controller = Controller(config)
     cv2 = None
 
     def emit(event):
@@ -75,7 +79,7 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
                 controller.pause(status, tick)
             elif key == "c":
                 controller.request_resume()
-            elif key == "t" and metrics is not None and hasattr(metrics, "begin_trial"):
+            elif key == "t" and config.control_mode == "pick" and metrics is not None and hasattr(metrics, "begin_trial"):
                 metrics.begin_trial(tick)
             sample = vision.latest_sample()
             vision_error = getattr(vision, "error", None)
@@ -100,7 +104,8 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
             if bridge is not None:
                 snapshot = simulation.snapshot()
                 snapshot.update(controller_state=controller.state.value, message=controller.message,
-                                source="synthetic" if vision.__class__.__module__ == "dev.scripted_vision" else "camera",
+                                source="synthetic" if getattr(vision, "is_synthetic", False) else "camera",
+                                control_mode=config.control_mode,
                                 vision_error=getattr(vision, "error", None))
                 bridge.publish(snapshot)
             remaining = 1.0 / config.loop_hz - (clock() - tick)
@@ -135,6 +140,7 @@ def main():
     parser.add_argument("--no-log", action="store_true")
     parser.add_argument("--source", default="0", help="Webcam index or video path")
     parser.add_argument("--hand", choices=["Right", "Left"], default="Right")
+    parser.add_argument("--mode", choices=["pick", "arm"], default="pick", help="Pick/place or full arm XYZ following")
     parser.add_argument("--headless", action="store_true", help="PyBullet DIRECT (no native GUI)")
     parser.add_argument("--web", action="store_true", help="Serve Three.js mirror at localhost")
     parser.add_argument("--port", type=int, default=8765)
@@ -147,10 +153,12 @@ def main():
     if args.duration is not None and args.duration <= 0:
         parser.error("--duration must be positive")
     config = replace(DEFAULT_CONFIG, camera_source=int(args.source) if args.source.isdigit() else args.source,
-                     hand_side=args.hand, simulation_gui=not args.headless)
-    if args.demo or args.vision_module == "dev.scripted_vision":
+                     hand_side=args.hand, simulation_gui=not args.headless, control_mode=args.mode)
+    if args.mode == "arm" and args.vision_module == "vision":
+        args.vision_module = "arm_vision"
+    if args.demo or args.vision_module in ("dev.scripted_vision", "dev.scripted_arm"):
         args.demo = True
-        args.vision_module = "dev.scripted_vision"
+        args.vision_module = "dev.scripted_arm" if args.mode == "arm" else "dev.scripted_vision"
         args.duration = args.duration or 14
     try:
         vision_cls = getattr(importlib.import_module(args.vision_module), "Vision")
@@ -177,7 +185,7 @@ def main():
         if args.demo:
             print("SYNTHETIC hand input; real PyBullet physics. Not a webcam evaluation.")
         run(vision_cls(config), sim_cls(config), metrics,
-            duration_s=args.duration, show_overlay=not args.no_overlay, bridge=bridge)
+            config=config, duration_s=args.duration, show_overlay=not args.no_overlay, bridge=bridge)
     except KeyboardInterrupt:
         pass
     finally:

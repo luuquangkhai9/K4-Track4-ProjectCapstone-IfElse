@@ -7,6 +7,7 @@ from contracts import HandSample
 class Vision:
     def __init__(self, config=DEFAULT_CONFIG):
         self.frame = 0
+        self.is_synthetic = True
 
     def start(self):
         self.started = time.monotonic()

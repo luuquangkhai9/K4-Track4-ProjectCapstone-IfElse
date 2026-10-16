@@ -13,6 +13,8 @@ class Action(str, Enum):
 
 
 class ControllerState(str, Enum):
+    CALIBRATING = "CALIBRATING"
+    FOLLOWING = "FOLLOWING"
     READY = "READY"
     LOWERING_PICK = "LOWERING_PICK"
     LIFTING = "LIFTING"
@@ -34,11 +36,24 @@ class HandSample:
 
 
 @dataclass(frozen=True)
+class ArmSample:
+    frame_id: int
+    captured_at: float
+    processed_at: float
+    valid: bool
+    shoulder_xyz: Vec3 = (0.0, 0.0, 0.0)
+    elbow_xyz: Vec3 = (0.0, 0.0, 0.0)
+    wrist_xyz: Vec3 = (0.0, 0.0, 0.0)
+
+
+@dataclass(frozen=True)
 class RobotCommand:
     target_xyz: Vec3
     gripper_closed: bool
     action: Action = Action.NONE
     box_id: str | None = None
+    elbow_xyz: Vec3 | None = None
+    hold_position: bool = False
 
 
 @dataclass(frozen=True)
@@ -48,6 +63,7 @@ class SimStatus:
     candidate_box_id: str | None = None
     held_box_id: str | None = None
     placed_box_ids: frozenset[str] = frozenset()
+    elbow_xyz: Vec3 | None = None
 
 
 @dataclass(frozen=True)

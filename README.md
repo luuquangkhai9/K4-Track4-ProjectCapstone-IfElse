@@ -17,6 +17,15 @@ Xem `README_DEMO.md` để cài runtime, điều khiển webcam, pause/reset, gh
 và chạy kiểm thử. Webcam → `vision.py` → controller TV1 → PyBullet trong
 `simulation/`; cảnh Three.js hiển thị trạng thái vật lý thực. Có cả log JSONL/CSV.
 
+Nhận diện cả vai–khuỷu–cổ tay và cho robot di chuyển theo cánh tay:
+
+```powershell
+./run-demo.ps1 --mode arm --web
+```
+
+Giữ yên cánh tay rồi nhấn **C** để hiệu chuẩn, chờ **FOLLOWING** trước khi di chuyển.
+`--hand Left` chọn tay trái; **P** dừng, **C** hiệu chuẩn lại, **R** reset.
+
 - `HACKATHON_PLAN.md`: phạm vi và tiêu chí nghiệm thu.
 - `TV1_HANDOFF.md`: hợp đồng dữ liệu và module.
 - `./run-demo.ps1 --demo --headless --web`: kiểm tra bằng tay tổng hợp và vật lý thật.

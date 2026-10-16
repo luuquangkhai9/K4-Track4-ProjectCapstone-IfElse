@@ -14,6 +14,10 @@ Tọa độ canonical là Z-up mét. Cảnh dùng phép đổi tọa độ hiể
 Khoảng cách, vùng gắp và số hộp thành công đều được tính bên PyBullet trước phép đổi.
 Xem `../README_DEMO.md` để chạy webcam hoặc demo tay tổng hợp và đọc log.
 
+`./run-demo.ps1 --mode arm --web --headless` bật robot theo cánh tay XYZ.
+Cảnh vẽ các vị trí khớp thực (`robot_links`) từ Panda, bao gồm khuỷu đang bám theo
+ước lượng vai–khuỷu–cổ tay. Hiệu chuẩn bằng C trước khi di chuyển; P dừng.
+
 ## Chế độ minh họa độc lập cũ
 
 Phần dưới mô tả cảnh Three.js ban đầu của TV3. Logic gắp/thả minh họa riêng này

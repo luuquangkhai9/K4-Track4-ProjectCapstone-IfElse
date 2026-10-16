@@ -38,19 +38,12 @@ class Vision:
         self._capture_thread = self._process_thread = None
         self._cap = self._model = None
         self.error = None
+        self._previous = None
+        self.is_synthetic = False
 
     def start(self):
         import cv2
-        import mediapipe as mp
-        path = Path(self.config.hand_model)
-        if not path.is_file():
-            raise FileNotFoundError(f"Missing {path}; run python -m dev.download_model")
-        self._model = mp.tasks.vision.HandLandmarker.create_from_options(
-            mp.tasks.vision.HandLandmarkerOptions(
-                base_options=mp.tasks.BaseOptions(model_asset_path=str(path)),
-                running_mode=mp.tasks.vision.RunningMode.VIDEO, num_hands=2,
-                min_hand_detection_confidence=.6, min_hand_presence_confidence=.6,
-                min_tracking_confidence=.6))
+        self._model = self._create_model()
         self._cap = cv2.VideoCapture(self.config.camera_source)
         if not self._cap.isOpened():
             raise RuntimeError(f"Cannot open camera/video {self.config.camera_source!r}")
@@ -60,12 +53,29 @@ class Vision:
         self._capture_thread.start()
         self._process_thread.start()
 
+    def _create_model(self):
+        import mediapipe as mp
+        path = Path(self.config.hand_model)
+        if not path.is_file():
+            raise FileNotFoundError(f"Missing {path}; run python -m dev.download_model")
+        return mp.tasks.vision.HandLandmarker.create_from_options(
+            mp.tasks.vision.HandLandmarkerOptions(
+                # Holistic changes MediaPipe's process-wide resource directory.
+                # Loading bytes keeps Tasks usable after a Holistic graph on Windows.
+                base_options=mp.tasks.BaseOptions(model_asset_buffer=path.read_bytes()),
+                running_mode=mp.tasks.vision.RunningMode.VIDEO, num_hands=2,
+                min_hand_detection_confidence=.6, min_hand_presence_confidence=.6,
+                min_tracking_confidence=.6))
+
     def _invalidate(self, reason):
         self.error = reason
         with self._lock:
             now = time.monotonic()
             frame_id = self._frame[0] if self._frame else 0
-            self._sample = HandSample(frame_id, now, now, False)
+            self._sample = self._invalid_sample(frame_id, now)
+
+    def _invalid_sample(self, frame_id, now):
+        return HandSample(frame_id, now, now, False)
 
     def _capture(self):
         import cv2
@@ -96,11 +106,8 @@ class Vision:
             self._cap.release()
 
     def _process(self):
-        import cv2
-        import mediapipe as mp
         last_id = last_ms = -1
         # Never transfer ownership to the other hand when the selected side vanishes.
-        previous = None
         try:
             while not self._stop.is_set():
                 with self._condition:
@@ -115,36 +122,42 @@ class Vision:
                 last_id = frame_id
                 timestamp = max(last_ms + 1, int(captured * 1000))
                 last_ms = timestamp
-                result = self._model.detect_for_video(
-                    mp.Image(image_format=mp.ImageFormat.SRGB,
-                             data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)), timestamp)
-                choices = [landmarks for landmarks, handedness in zip(result.hand_landmarks, result.handedness)
-                           if handedness and handedness[0].category_name == self.config.hand_side]
-                points = []
-                if choices:
-                    chosen = min(choices, key=lambda hand: dist((hand[0].x, hand[0].y), previous)) if previous else choices[0]
-                    points = [(p.x, p.y, p.z) for p in chosen]
-                    previous = points[0][:2]
-                h, w = frame.shape[:2]
-                sample = sample_from_landmarks(points, w, h, frame_id, captured, time.monotonic())
-                overlay = frame.copy()
-                left, top, right, bottom = self.config.image_rect
-                cv2.rectangle(overlay, (int(left*w), int(top*h)), (int(right*w), int(bottom*h)), (255, 180, 0), 2)
-                if points:
-                    # Use TV2's shared landmark rendering and topology.
-                    import numpy as np
-                    from run_holistic import draw_hand
-                    draw_hand(overlay, np.array(points), w, h)
-                if sample.valid:
-                    cv2.circle(overlay, (int(sample.u*w), int(sample.v*h)), 9, (0, 255, 255), 2)
-                text = f"{self.config.hand_side} hand | pinch={sample.pinch_ratio:.2f}" if sample.valid else "NO SELECTED HAND"
-                cv2.putText(overlay, text, (12, h-16), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 255, 255), 2)
+                sample, overlay = self._infer(frame, frame_id, captured, timestamp)
                 with self._lock:
                     if not self._stop.is_set():
                         self._sample, self._overlay = sample, overlay
         except Exception as exc:
             self._invalidate(str(exc))
             self._stop.set()
+
+    def _infer(self, frame, frame_id, captured, timestamp):
+        import cv2
+        import mediapipe as mp
+        result = self._model.detect_for_video(
+            mp.Image(image_format=mp.ImageFormat.SRGB,
+                     data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)), timestamp)
+        choices = [landmarks for landmarks, handedness in zip(result.hand_landmarks, result.handedness)
+                   if handedness and handedness[0].category_name == self.config.hand_side]
+        points = []
+        if choices:
+            chosen = min(choices, key=lambda hand: dist((hand[0].x, hand[0].y), self._previous)) if self._previous else choices[0]
+            points = [(p.x, p.y, p.z) for p in chosen]
+            self._previous = points[0][:2]
+        h, w = frame.shape[:2]
+        sample = sample_from_landmarks(points, w, h, frame_id, captured, time.monotonic())
+        overlay = frame.copy()
+        left, top, right, bottom = self.config.image_rect
+        cv2.rectangle(overlay, (int(left*w), int(top*h)), (int(right*w), int(bottom*h)), (255, 180, 0), 2)
+        if points:
+            # Use TV2's shared landmark rendering and topology.
+            import numpy as np
+            from run_holistic import draw_hand
+            draw_hand(overlay, np.array(points), w, h)
+        if sample.valid:
+            cv2.circle(overlay, (int(sample.u*w), int(sample.v*h)), 9, (0, 255, 255), 2)
+        text = f"{self.config.hand_side} hand | pinch={sample.pinch_ratio:.2f}" if sample.valid else "NO SELECTED HAND"
+        cv2.putText(overlay, text, (12, h-16), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 255, 255), 2)
+        return sample, overlay
 
     def latest_sample(self):
         with self._lock:

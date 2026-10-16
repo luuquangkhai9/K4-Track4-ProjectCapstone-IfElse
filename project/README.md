@@ -27,6 +27,10 @@ conda env create -f environment.yml
 conda activate armsim
 ```
 
+> Luôn `conda activate armsim` (hoặc `conda run -n armsim python main.py ...`) trước khi chạy.
+> Gọi thẳng `...\envs\armsim\python.exe` khi chưa activate sẽ thiếu đường dẫn DLL và
+> MediaPipe có thể crash (mã thoát 0xC06D007F).
+
 **Linux / macOS (hoặc Windows đã có C++ Build Tools):**
 
 ```bash

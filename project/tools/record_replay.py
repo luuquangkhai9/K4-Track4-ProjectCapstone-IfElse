@@ -109,25 +109,51 @@ class ReplayThread(threading.Thread):
         self.finished.set()
 
 
+UPPER_LEN, FORE_LEN = 0.28, 0.25
+
+
+def _elbow_ik(wrist: np.ndarray, bend_hint: np.ndarray) -> np.ndarray:
+    """IK 2 khâu (vai ở gốc): tìm khuỷu sao cho |khuỷu| = UPPER_LEN, |cổ tay - khuỷu| = FORE_LEN.
+
+    Khuỷu nằm trên đường tròn giao của hai mặt cầu; chọn điểm lệch về phía `bend_hint`.
+    """
+    a, b = UPPER_LEN, FORE_LEN
+    d = float(np.clip(np.linalg.norm(wrist), abs(a - b) + 1e-3, a + b - 1e-3))
+    axis = wrist / np.linalg.norm(wrist)
+    x = (a * a - b * b + d * d) / (2 * d)       # khoảng cách từ vai tới tâm đường tròn giao
+    h = np.sqrt(max(a * a - x * x, 0.0))       # bán kính đường tròn giao
+    perp = bend_hint - np.dot(bend_hint, axis) * axis
+    return x * axis + h * perp / (np.linalg.norm(perp) + 1e-9)
+
+
 def synthetic_frames(seconds: float = 20.0, rate: float = 30.0, hands: str = "right") -> list[dict[str, ArmHandFrame]]:
-    """Sinh chuyển động giả: với tay ra trước, hạ xuống chạm mặt bàn, nắm/mở bàn tay.
+    """Sinh chuyển động giả: cổ tay quét ngang sát mặt bàn (gạt các khối hộp), nhấc lên, nắm/mở bàn tay.
 
     Có chèn một đoạn mất dấu (valid=False) để thử trạng thái màu xám.
     Chuyển động được tạo trong hệ sim (dễ nghĩ hơn) rồi đổi về hệ MediaPipe.
+    Quỹ đạo giả định cấu hình mặc định: vai ở z = 1.4, mặt bàn ở z = 0.85.
     """
     sides = parse_sides(hands)
     frames: list[dict[str, ArmHandFrame]] = []
     n = int(seconds * rate)
+    w = 2 * np.pi / 6.0  # chu kỳ 6 s
     for i in range(n):
         t = i / rate
-        w = 2 * np.pi / 6.0  # chu kỳ 6 s
         out: dict[str, ArmHandFrame] = {}
         for s in sides:
             sign = 1.0 if s == "left" else -1.0  # bên trái người là +Y trong hệ sim
-            upper = np.array([0.35 + 0.25 * np.sin(w * t), sign * 0.15, -1.0])
-            fore = np.array([1.0, sign * 0.25 * np.sin(0.7 * w * t), -0.35 - 0.55 * (0.5 + 0.5 * np.sin(w * t + 1.0))])
-            curl = 0.75 * (0.5 + 0.5 * np.sin(1.3 * w * t))
-            pts_sim = build_arm_points(s, upper, fore, palm_normal=np.array([0.0, 0.0, -1.0]), curl=curl)
+            # Cổ tay: quét theo Y qua vùng có hộp, phần lớn thời gian ở sát mặt bàn, thỉnh thoảng nhấc lên
+            lift = 0.15 * max(0.0, np.sin(0.5 * w * t)) ** 4
+            wrist = np.array([0.30, sign * 0.06 + 0.24 * np.sin(w * t), -0.46 + lift])
+            elbow = _elbow_ik(wrist, bend_hint=np.array([-0.3, sign * 0.6, -1.0]))
+            fore = wrist - elbow
+            # Bàn tay hướng ra trước và hơi chúc xuống, lòng bàn tay úp
+            hand_dir = np.array([1.0, 0.0, -0.35])
+            curl = 0.6 * (0.5 + 0.5 * np.sin(1.3 * w * t))
+            pts_sim = build_arm_points(s, elbow, hand_dir, palm_normal=np.array([0.0, 0.0, -1.0]), curl=curl,
+                                       upper_len=UPPER_LEN, fore_len=0.0)
+            # build_arm_points đặt cổ tay = khuỷu + fore_len * hướng bàn tay; dời bàn tay tới cổ tay thật
+            pts_sim[2:] += fore
             if len(sides) == 2:
                 pts_sim += np.array([0.0, sign * 0.18, 0.0])  # gốc ở giữa hai vai
             valid = not (0.6 * seconds <= t < 0.6 * seconds + 1.5)  # 1.5 s "mất dấu"

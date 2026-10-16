@@ -40,11 +40,11 @@ sim:
     - [0.55, -0.05, 0.05]
     - [0.40, 0.10, 0.06]
     - [0.60, 0.22, 0.04]
-  camera:                  # camera debug của PyBullet: nhìn từ sau lưng người
-    distance: 1.6
-    yaw: -90
-    pitch: -25
-    target: [0.35, 0.0, 1.05]
+  camera:                  # camera debug của PyBullet
+    distance: 1.5
+    yaw: -45              # -90 = thẳng sau lưng, -45 = sau lưng chéo bên phải
+    pitch: -30
+    target: [0.35, 0.0, 1.0]
 
 record:
   print_hz: 5              # tần suất in tọa độ ở chế độ --print

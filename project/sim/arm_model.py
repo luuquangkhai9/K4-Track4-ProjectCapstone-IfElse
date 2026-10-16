@@ -35,13 +35,13 @@ PALM_BONES = {(0, 5), (5, 9), (9, 13), (13, 17), (0, 17)}
 def _joint_radius(idx: int) -> float:
     if idx < HAND_OFFSET:
         return (0.045, 0.040, 0.030)[idx]
-    return 0.010 if (idx - HAND_OFFSET) % 4 == 0 else 0.011  # đầu ngón nhỏ hơn chút
+    return 0.012 if (idx - HAND_OFFSET) % 4 == 0 else 0.013  # đầu ngón nhỏ hơn chút
 
 
 def _bone_radius(a: int, b: int) -> float:
     if a < HAND_OFFSET:
         return 0.040 if a == 0 else 0.032
-    return 0.0085
+    return 0.011  # hơi to hơn ngón thật để dễ nhìn và dễ va chạm
 
 
 class ArmModel:

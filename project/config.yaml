@@ -1,0 +1,50 @@
+# Cấu hình dự án nhận diện cánh tay/bàn tay 3D -> PyBullet
+
+camera:
+  id: 0                  # chỉ số webcam (0 = webcam mặc định)
+  width: 640              # nhiều webcam chỉ cho ~10 FPS ở 1280x720
+  height: 480
+  fps: 30
+  source_mirrored: false # true nếu driver webcam TỰ lật gương ảnh (sẽ lật lại trước khi suy luận)
+
+display:
+  show_camera: true      # cửa sổ OpenCV hiển thị webcam + keypoint
+  mirror: true           # lật ảnh khi HIỂN THỊ cho giống soi gương (không ảnh hưởng dữ liệu 3D)
+
+perception:
+  hands: right           # left | right | both
+  pose_model: full       # lite (nhanh) | full | heavy (chậm, chính xác hơn)
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  min_visibility: 0.5    # visibility tối thiểu của vai/khuỷu/cổ tay trong pose
+  hand_match_max_dist: 0.15  # khoảng cách tối đa (tọa độ ảnh chuẩn hoá) giữa cổ tay pose và cổ tay hand
+  hold_time: 0.5         # giây giữ giá trị cuối khi mất dấu trước khi đánh dấu invalid
+
+filter:                  # One Euro Filter (vị trí tính bằng mét)
+  min_cutoff: 1.0        # Hz - nhỏ hơn => mượt hơn khi đứng yên nhưng trễ hơn
+  beta: 4.0              # tăng => bớt trễ khi chuyển động nhanh
+  d_cutoff: 1.0          # Hz - tần số cắt cho vận tốc
+
+sim:
+  origin: [0.0, 0.0, 1.4]  # vị trí vai (gốc) trong cảnh PyBullet
+  scale: 1.0               # phóng to/thu nhỏ cánh tay trong mô phỏng
+  rate: 60                 # Hz vòng lặp mô phỏng (mỗi vòng chia nhỏ thành nhiều bước vật lý)
+  physics_hz: 240
+  calib_frames: 30         # số frame hợp lệ đầu tiên dùng để đo độ dài xương (0 = dùng kích thước mặc định)
+  table:
+    center: [0.5, 0.0]     # tâm mặt bàn (x, y)
+    size: [0.6, 1.0]       # kích thước mặt bàn (x, y)
+    height: 0.85
+  boxes:                   # khối hộp nhỏ trên bàn (x, y, cạnh)
+    - [0.45, -0.20, 0.05]
+    - [0.55, -0.05, 0.05]
+    - [0.40, 0.10, 0.06]
+    - [0.60, 0.22, 0.04]
+  camera:                  # camera debug của PyBullet: nhìn từ sau lưng người
+    distance: 1.6
+    yaw: -90
+    pitch: -25
+    target: [0.35, 0.0, 1.05]
+
+record:
+  print_hz: 5              # tần suất in tọa độ ở chế độ --print

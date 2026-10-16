@@ -1,0 +1,16 @@
+# Môi trường conda (khuyên dùng trên Windows: PyPI không có wheel PyBullet cho Windows)
+#   conda env create -f environment.yml
+#   conda activate armsim
+name: armsim
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pybullet
+  - numpy
+  - pyyaml
+  - matplotlib
+  - pip
+  - pip:
+      - mediapipe>=0.10.14
+      - opencv-python>=4.8

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101820">
+  <title>Robot Pick Cell · Mô phỏng điều khiển thời gian thực</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <div id="stage" aria-label="Môi trường mô phỏng dây chuyền và cánh tay robot"></div>
+    <div class="vignette"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Robot Pick Cell">
+        <span class="brand-mark"><i></i><i></i><i></i></span>
+        <span><b>ROBOT PICK CELL</b><small>REAL-TIME SIMULATION</small></span>
+      </a>
+      <div class="top-meta"><span class="live-dot"></span><span id="connection">ĐANG KẾT NỐI</span><span class="meta-divider"></span><span>CPU MODE</span></div>
+    </header>
+
+    <aside class="control-panel">
+      <div class="panel-kicker"><span class="kicker-line"></span>WORKCELL 01</div>
+      <h1>Gắp và phân loại</h1>
+      <p class="intro">Điều khiển cánh tay robot bằng vị trí đầu kẹp đã chuyển đổi từ keypoints.</p>
+
+      <div class="status-row"><span class="status-icon" id="status-icon"><span></span></span><div><strong id="run-state">Đang chờ lệnh</strong><small id="run-detail">Gửi lệnh qua API để di chuyển robot</small></div><span class="state-tag" id="state-tag">IDLE</span></div>
+
+      <div class="section-label">TRẠNG THÁI ĐẦU KẸP</div>
+      <div class="telemetry">
+        <div><span>VỊ TRÍ X</span><b id="coord-x">0.00 <small>m</small></b></div>
+        <div><span>VỊ TRÍ Y</span><b id="coord-y">0.00 <small>m</small></b></div>
+        <div><span>VỊ TRÍ Z</span><b id="coord-z">0.00 <small>m</small></b></div>
+      </div>
+      <div class="grip-row"><span><i class="grip-led" id="grip-led"></i> KẸP</span><b id="grip-state">MỞ</b></div>
+
+      <button class="demo-button" id="demo-button" type="button"><span class="play-icon">▶</span><span><b>Chạy demo gắp hàng</b><small>Phát lại một lượt gắp mẫu</small></span><span class="button-arrow">↗</span></button>
+      <button class="reset-button" id="reset-button" type="button">Đưa robot về vị trí chờ <span>↺</span></button>
+
+      <div class="divider"></div>
+      <div class="section-label api-label">ĐIỂM NHẬN LỆNH <span class="api-dot"></span></div>
+      <div class="api-endpoint"><span class="method">POST</span><code>/api/command</code></div>
+      <div class="api-note">Tọa độ mục tiêu tính bằng mét trong hệ trục mô phỏng.</div>
+      <button class="contract-toggle" id="contract-toggle" type="button" aria-expanded="false">Xem định dạng lệnh <span>＋</span></button>
+      <pre class="contract" id="contract" hidden>{
+  "target": { "x": -1.3, "y": 0.85, "z": -1.1 },
+  "grip": 1
+}</pre>
+    </aside>
+
+    <div class="scene-caption"><span class="caption-dot"></span><div><b>GÓC NHÌN WORKCELL</b><small>Dây chuyền đầu vào <i>→</i> khay đích</small></div></div>
+    <div class="scene-hint"><span>DRAG</span> xoay cảnh <i>·</i> <span>SCROLL</span> thu phóng</div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="loading" id="loading"><span class="loader"></span><span>ĐANG TẢI MÔI TRƯỜNG 3D</span></div>
+  </main>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

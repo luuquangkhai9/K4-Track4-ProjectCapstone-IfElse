@@ -1,0 +1,11 @@
+trial_id,operator,requested_box_id,picked_box_id,placed_in_bin,duration_s,failure_reason
+S01,sample_operator_A,box_red,box_red,true,12,
+S02,sample_operator_A,box_blue,box_blue,true,15,
+S03,sample_operator_A,box_green,box_green,true,18,
+S04,sample_operator_A,box_red,box_red,true,20,
+S05,sample_operator_A,box_blue,box_blue,true,30,
+S06,sample_operator_B,box_green,box_green,true,24,
+S07,sample_operator_B,box_red,box_red,true,26,
+S08,sample_operator_B,box_blue,box_blue,true,28,
+S09,sample_operator_B,box_green,box_red,true,14,
+S10,sample_operator_B,box_red,,false,9,reset_during_tracking_loss

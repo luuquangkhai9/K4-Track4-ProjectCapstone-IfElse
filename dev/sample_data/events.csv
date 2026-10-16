@@ -1,0 +1,5 @@
+timestamp,event_type,trial_id,box_id,controller_state,reason
+100,TRIAL_START,S10,box_red,READY,
+102,TRACKING_LOST,S10,,PAUSED,hand_occluded
+109,RESET,S10,,READY,reset_during_tracking_loss
+109,TRIAL_END,S10,,READY,reset_during_tracking_loss

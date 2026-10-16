@@ -189,3 +189,14 @@ chụm lúc khởi động, gắp xa hộp, attach thất bại, phân biệt l�
 thả ngoài giỏ, placement thất bại, mất tay khi giữ hộp, phục hồi có xác nhận,
 frame lỗi/lặp/cũ, timeout, reset giữa chu trình, điều phối và cleanup khi camera lỗi.
 Không thay thế bảy kiểm tra tích hợp bắt buộc trên máy demo trong HACKATHON_PLAN.md.
+
+## Tích hợp nhánh TV4 vào main
+
+Đã bổ sung công cụ của `feat/thanh-vien-4`: `dev.fakes`, `dev.run_metrics`,
+fixtures, logger độc lập và báo cáo. Fake dùng `HandSample` keypoints thô hiện tại;
+API `Metrics(config)` của ứng dụng được giữ bên cạnh `MetricsLogger` của TV4.
+CSV trial từ ứng dụng có thể nhập thẳng bằng runner TV4. Dependency tích hợp vẫn
+đi qua `requirements-demo.txt`; snapshot Linux TV4 được giữ để tham khảo.
+
+Kiểm tra độc lập: `python -m dev.run_metrics --self-check` và
+`python -m dev.run_metrics`. Lệnh thứ hai chỉ tạo kết quả mẫu trong thư mục tạm.

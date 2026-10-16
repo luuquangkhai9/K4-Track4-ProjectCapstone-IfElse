@@ -189,3 +189,27 @@ người và chưa có video dự phòng; không suy ra tỷ lệ thành công t
 khuyến nghị cho demo tích hợp là `main.py` qua `run-demo.ps1`.
 Huấn luyện CMU chỉ cần khi chủ động dùng pipeline cũ:
 `python -m pip install -r requirements-training.txt` (ngoài phạm vi MVP).
+
+## Công cụ kiểm chứng TV4 đã tích hợp
+
+```powershell
+.runtime/python/python.exe -m dev.run_metrics --self-check
+.runtime/python/python.exe -m dev.run_metrics
+.runtime/python/python.exe -m dev.run_metrics --check-env --check-simulation
+```
+
+Runner mặc định kiểm tra dữ liệu mẫu và tạo báo cáo trong thư mục tạm, ngoài
+`results/`; các số liệu này không phải kết quả demo thật. Fake đã dùng hợp đồng
+keypoints thô hiện tại. `metrics.py` cung cấp cả `Metrics` cho ứng dụng và
+`MetricsLogger`, `read_trials`, `summarize`, `write_report` cho đánh giá độc lập.
+
+Nhập CSV đã ghi từ ứng dụng để tổng hợp (thay đường dẫn và mã build thực tế):
+
+```powershell
+.runtime/python/python.exe -m dev.run_metrics --input results/live/SESSION/trials.csv --data-kind real --revision BUILD_ID
+```
+
+Kết quả đo cần có đủ 10 lượt, ít nhất hai người; giữ cả lượt thất bại/reset.
+Xem `DEMO_SCRIPT.md` để chuẩn bị phần trình bày và `results/README.md` cho quy ước
+lưu bằng chứng. Snapshot Linux của TV4 trong `results/environment/` là tài liệu
+lịch sử, không thay thế runtime Windows của `setup-demo.ps1`.

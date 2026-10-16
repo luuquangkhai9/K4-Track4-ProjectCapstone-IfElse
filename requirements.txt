@@ -1,1 +1,2 @@
+# Integrated demo runtime; historical TV4 Linux pins are in results/environment/.
 -r requirements-demo.txt

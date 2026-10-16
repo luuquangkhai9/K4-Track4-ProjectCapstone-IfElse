@@ -1,7 +1,7 @@
-"""Single-owner integration loop. Real vision/simulation modules are supplied by TV2/TV3."""
+"""Webcam -> hand landmarks -> controller -> PyBullet, with optional Three.js mirror."""
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import importlib
 import time
 
@@ -17,7 +17,8 @@ def initial_status(simulation, result, config):
 
 
 def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
-        duration_s=None, show_overlay=True, clock=time.monotonic, sleep=time.sleep):
+        duration_s=None, show_overlay=True, clock=time.monotonic, sleep=time.sleep,
+        bridge=None):
     """Integrate injected modules; all simulation calls occur on this thread.
 
     Factories: Vision(config), Simulation(config), optional Metrics(config).
@@ -39,6 +40,7 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
         vision.start()
         started = clock()
         previous = started
+        last_vision_error = None
         emit(Event(clock(), "session_started"))
         while duration_s is None or clock() - started < duration_s:
             tick = clock()
@@ -46,6 +48,8 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
             dt = min(config.max_control_dt, max(0.0, tick - previous))
             previous = tick
             key = vision.poll_key() if hasattr(vision, "poll_key") else None
+            if bridge is not None:
+                key = bridge.poll_key() or key
             if show_overlay and hasattr(vision, "latest_overlay"):
                 frame = vision.latest_overlay()
                 if frame is not None:
@@ -71,7 +75,14 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
                 controller.pause(status, tick)
             elif key == "c":
                 controller.request_resume()
+            elif key == "t" and metrics is not None and hasattr(metrics, "begin_trial"):
+                metrics.begin_trial(tick)
             sample = vision.latest_sample()
+            vision_error = getattr(vision, "error", None)
+            if vision_error and vision_error != last_vision_error:
+                print(f"Vision paused: {vision_error}")
+                emit(Event(clock(), "vision_error", reason=vision_error))
+            last_vision_error = vision_error
             # Read now AFTER the asynchronous producer's sample to avoid treating
             # a just-completed camera callback as a timestamp from the future.
             command = controller.update(sample, status, clock())
@@ -84,11 +95,22 @@ def run(vision, simulation, metrics=None, config: Config = DEFAULT_CONFIG,
                 simulation.release()
             for event in controller.drain_events():
                 emit(event)
+            if metrics is not None and hasattr(metrics, "tick"):
+                metrics.tick(clock())
+            if bridge is not None:
+                snapshot = simulation.snapshot()
+                snapshot.update(controller_state=controller.state.value, message=controller.message,
+                                source="synthetic" if vision.__class__.__module__ == "dev.scripted_vision" else "camera",
+                                vision_error=getattr(vision, "error", None))
+                bridge.publish(snapshot)
             remaining = 1.0 / config.loop_hz - (clock() - tick)
             if remaining > 0:
                 sleep(remaining)
         emit(Event(clock(), "session_ended", controller_state=controller.state.value))
         return status
+    except Exception as exc:
+        emit(Event(clock(), "session_failed", reason=str(exc)))
+        raise
     finally:
         # All resources get a cleanup attempt even if one close raises.
         try:
@@ -109,27 +131,58 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vision-module", default="vision")
     parser.add_argument("--simulation-module", default="simulation")
-    parser.add_argument("--metrics-module", help="Optional module exporting Metrics(config)")
+    parser.add_argument("--metrics-module", default="metrics", help="Module exporting Metrics(config)")
+    parser.add_argument("--no-log", action="store_true")
+    parser.add_argument("--source", default="0", help="Webcam index or video path")
+    parser.add_argument("--hand", choices=["Right", "Left"], default="Right")
+    parser.add_argument("--headless", action="store_true", help="PyBullet DIRECT (no native GUI)")
+    parser.add_argument("--web", action="store_true", help="Serve Three.js mirror at localhost")
+    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--demo", action="store_true", help="Synthetic hand input with REAL PyBullet physics")
+    parser.add_argument("--operator", default="operator")
+    parser.add_argument("--trial-box", choices=[box[0] for box in DEFAULT_CONFIG.boxes], default="green")
     parser.add_argument("--duration", type=float, help="Stop after N seconds")
     parser.add_argument("--no-overlay", action="store_true")
     args = parser.parse_args()
     if args.duration is not None and args.duration <= 0:
         parser.error("--duration must be positive")
+    config = replace(DEFAULT_CONFIG, camera_source=int(args.source) if args.source.isdigit() else args.source,
+                     hand_side=args.hand, simulation_gui=not args.headless)
+    if args.demo or args.vision_module == "dev.scripted_vision":
+        args.demo = True
+        args.vision_module = "dev.scripted_vision"
+        args.duration = args.duration or 14
     try:
         vision_cls = getattr(importlib.import_module(args.vision_module), "Vision")
         sim_cls = getattr(importlib.import_module(args.simulation_module), "Simulation")
         metrics_cls = (getattr(importlib.import_module(args.metrics_module), "Metrics")
-                       if args.metrics_module else None)
+                       if not args.no_log else None)
     except (ImportError, AttributeError) as exc:
         parser.exit(2, f"Integration module unavailable: {exc}\n"
                     "TV2/TV3 must supply Vision(config)/Simulation(config). "
                     "Run python -m dev.run_control for the independent TV1 demo.\n")
+    bridge = None
     try:
-        run(vision_cls(DEFAULT_CONFIG), sim_cls(DEFAULT_CONFIG),
-            metrics_cls(DEFAULT_CONFIG) if metrics_cls else None,
-            duration_s=args.duration, show_overlay=not args.no_overlay)
+        if args.web:
+            from simulation.serve import IntegrationBridge
+            bridge = IntegrationBridge(args.port)
+            print(f"Three.js physics mirror: http://127.0.0.1:{bridge.server.server_port}")
+        if metrics_cls and args.metrics_module == "metrics":
+            metrics = metrics_cls(config, directory="results/synthetic" if args.demo else "results/live",
+                                  operator=args.operator, requested_box_id=args.trial_box,
+                                  source="synthetic" if args.demo else "camera")
+            print(f"Logs: {metrics.directory}")
+        else:
+            metrics = metrics_cls(config) if metrics_cls else None
+        if args.demo:
+            print("SYNTHETIC hand input; real PyBullet physics. Not a webcam evaluation.")
+        run(vision_cls(config), sim_cls(config), metrics,
+            duration_s=args.duration, show_overlay=not args.no_overlay, bridge=bridge)
     except KeyboardInterrupt:
         pass
+    finally:
+        if bridge is not None:
+            bridge.close()
 
 
 if __name__ == "__main__":

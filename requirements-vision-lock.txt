@@ -1,0 +1,27 @@
+# Vision dependencies verified on Windows x64 / Python 3.11.17.
+# PyBullet is installed separately by conda-forge on Windows.
+absl-py==2.5.1
+attrs==26.1.0
+cffi==2.1.1
+contourpy==1.3.3
+cycler==0.12.1
+flatbuffers==25.12.19
+fonttools==4.67.0
+jax==0.7.1
+jaxlib==0.7.1
+kiwisolver==1.5.1
+matplotlib==3.11.2
+mediapipe==0.10.14
+ml-dtypes==0.5.4
+numpy==1.26.4
+opencv-contrib-python==4.10.0.84
+opt-einsum==3.4.0
+packaging==26.3
+pillow==12.3.0
+protobuf==4.25.9
+pycparser==3.11
+pyparsing==3.3.3
+python-dateutil==2.9.0.post0
+scipy==1.17.1
+six==1.17.0
+sounddevice==0.5.6

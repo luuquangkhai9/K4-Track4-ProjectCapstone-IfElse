@@ -4,8 +4,9 @@
 
 Đã triển khai phần TV1 độc lập với camera và thư viện robot. `contracts.py`,
 `config.py` là giao diện dùng chung; thay đổi hai file này cần thống nhất với TV1.
-Chưa có `vision.py`, `simulation.py` hoặc `metrics.py` thật trong repo. Vì vậy,
-chưa thể công bố hoàn thành tích hợp webcam → robot, kiểm chứng IK hay số đo demo.
+Phần tích hợp hiện có `vision.py`, package `simulation/` và `metrics.py` theo
+giao diện bên dưới. Xem `README_DEMO.md` để thiết lập runtime và chạy hệ thống
+đã ghép. Các runner TV1 vẫn giữ vai trò kiểm thử bằng dữ liệu tổng hợp.
 
 ## Chạy ngay
 
@@ -83,8 +84,8 @@ chưa nằm trong giỏ và chưa có liên kết; attach lặp cùng hộp ph�
 khi đã chọn hộp, controller giữ nguyên ID cho cả chu trình hạ/gắp.
 Release/reset phải dọn liên kết; chỉ ghi nhận placed khi hộp nằm trong giỏ và ổn định.
 
-**Cấu hình hình học hiện là đề xuất chưa kiểm chứng IK.** TV3 cần gửi lại workspace,
-home, pose hướng xuống, vị trí hộp/giỏ và độ cao EE thực sự với tới được.
+**Cấu hình mặc định đã qua kiểm tra IK với Panda đi kèm PyBullet.** Khi đổi robot,
+cần kiểm chứng lại workspace, home, pose hướng xuống và độ cao EE.
 Các giá trị Z là gốc link EE, không phải đáy ngón kẹp. Khoảng cách attach đo tại
 điểm gắp đã bù tool offset; TV3 cần chốt transform này với TV1 trước tích hợp.
 Không so trực tiếp khoảng cách tâm hộp tới gốc EE khi tool có độ lệch.

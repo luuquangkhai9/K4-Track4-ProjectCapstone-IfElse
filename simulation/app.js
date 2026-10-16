@@ -3,6 +3,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var T = window.THREE;
+  var integratedState = null, integratedReceivedAt = 0;
   if (!T) {
     $("loading").innerHTML = "<span>KHÔNG TẢI ĐƯỢC THREE.JS</span><span style='font:11px sans-serif;letter-spacing:0'>Kiểm tra kết nối mạng rồi tải lại trang.</span>";
     return;
@@ -318,6 +319,7 @@
     });
   }
   function startDemo() {
+    if (integratedState) return;
     if (demo) return;
     resetProducts(); makeDemoSteps(); demo = { index: 0, elapsed: 0, from: currentTarget.clone(), fromGrip: currentGrip };
     $("demo-button").disabled = true;
@@ -333,6 +335,7 @@
   }
   function stopDemo() { demo = null; $("demo-button").disabled = false; }
   function resetArm() {
+    if (integratedState) { sendInput("r"); return; }
     stopDemo(); resetProducts(); commandedTarget.set(-.2, 2.08, .12); commandedGrip = 0;
     updateStatus("Đang chờ lệnh", apiOnline ? "Gửi lệnh qua API để di chuyển robot" : "Khởi động bridge để nhận lệnh", false);
   }
@@ -353,6 +356,7 @@
     updateStatus("Đã nhận lệnh", "Đang theo dõi mục tiêu đầu kẹp", true);
   }
   async function pollCommands() {
+    if (integratedState) { window.setTimeout(pollCommands, 1000); return; }
     try {
       var response = await fetch("/api/command?after=" + lastSequence, { cache: "no-store" });
       if (!response.ok) throw new Error("bridge offline");
@@ -361,7 +365,7 @@
         apiOnline = true; $("connection").textContent = "BRIDGE SẴN SÀNG"; document.querySelector(".live-dot").classList.remove("offline");
         if (!demo) updateStatus("Đang chờ lệnh", "Gửi lệnh qua API để di chuyển robot", false);
       }
-      if (body.command && body.sequence > lastSequence) { lastSequence = body.sequence; applyCommand(body.command); }
+      if (!integratedState && body.command && body.sequence > lastSequence) { lastSequence = body.sequence; applyCommand(body.command); }
     } catch (_) {
       apiOnline = false; $("connection").textContent = "BRIDGE NGOẠI TUYẾN"; document.querySelector(".live-dot").classList.add("offline");
       if (!demo) updateStatus("Chưa kết nối bridge", "Chạy python simulation/serve.py để nhận lệnh", false);
@@ -370,6 +374,67 @@
   }
   fetch("/api/health", { cache: "no-store" }).catch(function () {});
   pollCommands();
+
+  async function sendInput(key) {
+    try {
+      var response = await fetch("/api/input", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({key: key}) });
+      if (!response.ok) throw new Error("input rejected");
+    } catch (_) { showToast("Không gửi được lệnh; kiểm tra main.py --web"); }
+  }
+  async function pollState() {
+    try {
+      var response = await fetch("/api/state", {cache: "no-store"});
+      if (!response.ok) throw new Error("state unavailable");
+      var body = await response.json();
+      if (body.active && body.ready) {
+        if (!integratedState || body.revision !== integratedState.revision) integratedReceivedAt = performance.now();
+        integratedState = body;
+        stopDemo();
+        $("demo-button").disabled = true;
+        $("integration-controls").hidden = false;
+        document.body.classList.add("integrated");
+        document.querySelector(".intro").textContent = "Trạng thái thực từ PyBullet. Điều khiển bằng tay trong webcam; cảnh này chỉ hiển thị kết quả.";
+      }
+    } catch (_) { /* Keep the last physics frame, never simulate missing feedback. */ }
+    window.setTimeout(pollState, 50);
+  }
+  document.querySelectorAll("[data-input]").forEach(function (button) {
+    button.addEventListener("click", function () { sendInput(button.getAttribute("data-input")); });
+  });
+  pollState();
+
+  // Display-only world transform: canonical Z-up meters -> Three.js Y-up.
+  function physicsPoint(point) {
+    return new T.Vector3((point[0] - .5) * 6 + .22, point[2] * 6 + .66,
+                         (point[1] + .18) * 6 - 1.48);
+  }
+  function mirrorPhysics() {
+    var state = integratedState;
+    currentTarget.copy(physicsPoint(state.ee_xyz));
+    commandedTarget.copy(physicsPoint(state.target_xyz));
+    currentGrip = state.held_box_id ? 1 : 0;
+    heldProduct = null;
+    var ids = ["red", "green", "blue"], colors = [0xff2626, 0x26cc33, 0x264dff];
+    products.forEach(function (product, i) {
+      var id = ids[i], point = state.boxes[id];
+      product.group.visible = !!point;
+      product.available = false;
+      if (point) product.group.position.copy(physicsPoint(point));
+      product.group.scale.setScalar(.30 / .39);
+      product.group.children[0].material.color.setHex(state.candidate_box_id === id ? 0xffff26 : colors[i]);
+      product.status = state.held_box_id === id ? "held" : "physics";
+    });
+    var bin = physicsPoint([state.bin_center[0], state.bin_center[1], 0]);
+    basket.scale.set(1.44 / bw, .36 / bh, .78 / bd);
+    basket.position.set(bin.x, .66 - .19 * .36 / bh, bin.z);
+    basketCount = state.placed_box_ids.length;
+    solveArm();
+    var stale = performance.now() - integratedReceivedAt > 750;
+    $("connection").textContent = stale ? "PHYSICS NGOẠI TUYẾN" : "PYBULLET LIVE · " + (state.source === "synthetic" ? "TAY GIẢ LẬP" : "WEBCAM");
+    document.querySelector(".live-dot").classList.toggle("offline", stale);
+    updateStatus(state.controller_state, (state.vision_error || state.message) + " | placed=" + basketCount, !stale);
+    $("state-tag").textContent = stale ? "STALE" : state.controller_state;
+  }
 
   function updateDemo(dt) {
     if (!demo) return;
@@ -416,12 +481,16 @@
   function frame() {
     requestAnimationFrame(frame);
     var dt = Math.min(clock.getDelta(), .05);
-    advanceConveyor(dt);
-    updateDemo(dt);
-    var alpha = 1 - Math.exp(-dt * 17);
-    currentTarget.lerp(commandedTarget, alpha); currentGrip += (commandedGrip - currentGrip) * (1 - Math.exp(-dt * 14));
-    solveArm(); captureProduct();
-    if (heldProduct && currentGrip < .25) releaseProduct();
+    if (integratedState) {
+      mirrorPhysics();
+    } else {
+      advanceConveyor(dt);
+      updateDemo(dt);
+      var alpha = 1 - Math.exp(-dt * 17);
+      currentTarget.lerp(commandedTarget, alpha); currentGrip += (commandedGrip - currentGrip) * (1 - Math.exp(-dt * 14));
+      solveArm(); captureProduct();
+      if (heldProduct && currentGrip < .25) releaseProduct();
+    }
     for (var i = 0; i < rollers.length; i++) rollers[i].rotation.z += dt * 2.3;
     beltTicks.forEach(function (tick) { tick.position.x += dt * .28; if (tick.position.x > .49) tick.position.x = -3.72; });
     targetDot.rotation.z += dt * .25; targetDot.material.opacity = .52 + Math.sin(performance.now() * .003) * .12;

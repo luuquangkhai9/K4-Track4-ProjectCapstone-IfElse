@@ -1,8 +1,7 @@
-"""Shared defaults in meters/seconds. TV3 must validate geometry with its robot.
+"""Shared Z-up meters/seconds; workspace checked with the bundled Panda robot.
 
-The initial layout is a proposal for a downward-facing tabletop arm, not a
-claim that IK has already been verified. Heights refer to the EE link origin;
-TV3 must account for its tool offset and the box attachment transform.
+Heights refer to panda_grasptarget (link 11). The virtual grasp center is
+grasp_offset meters below that link. A different robot needs new IK checks.
 """
 
 from dataclasses import dataclass
@@ -45,6 +44,12 @@ class Config:
     placement_settle_s: float = 0.30
     max_control_dt: float = 0.05
     loop_hz: float = 60.0
+    camera_source: int | str = 0
+    hand_model: str = "models/hand_landmarker.task"
+    hand_side: str = "Right"
+    simulation_gui: bool = True
+    grasp_offset: float = 0.05
+    candidate_distance: float = 0.04
 
     def __post_init__(self):
         if not 0 <= self.pinch_close < self.pinch_open:

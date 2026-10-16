@@ -1,0 +1,4 @@
+# Optional legacy experiments only; not required by main.py.
+-r requirements-demo.txt
+torch
+torchvision

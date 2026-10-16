@@ -2,3 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+models/*.task
+models/*.download
+results/
+.runtime/

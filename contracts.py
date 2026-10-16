@@ -1,6 +1,6 @@
 """Shared module contracts. This module deliberately uses only the stdlib."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 Vec3 = tuple[float, float, float]
@@ -13,6 +13,8 @@ class Action(str, Enum):
 
 
 class ControllerState(str, Enum):
+    CALIBRATING = "CALIBRATING"
+    FOLLOWING = "FOLLOWING"
     READY = "READY"
     LOWERING_PICK = "LOWERING_PICK"
     LIFTING = "LIFTING"
@@ -28,9 +30,26 @@ class HandSample:
     captured_at: float
     processed_at: float
     valid: bool
-    u: float = 0.5
-    v: float = 0.5
-    pinch_ratio: float = 1.0
+    arm_side: str = "Right"
+    # Mirrored normalized image coordinates, never world coordinates.
+    # Arm values: x, y, z, visibility, presence; hand values: x, y, z.
+    arm_keypoints: dict[str, tuple[float, ...]] = field(default_factory=dict)
+    hand_keypoints: tuple[Vec3, ...] = ()
+    pose_valid: bool = False
+    hand_valid: bool = False
+    image_width: int = 0
+    image_height: int = 0
+
+
+@dataclass(frozen=True)
+class ArmSample:
+    frame_id: int
+    captured_at: float
+    processed_at: float
+    valid: bool
+    shoulder_xyz: Vec3 = (0.0, 0.0, 0.0)
+    elbow_xyz: Vec3 = (0.0, 0.0, 0.0)
+    wrist_xyz: Vec3 = (0.0, 0.0, 0.0)
 
 
 @dataclass(frozen=True)
@@ -39,6 +58,8 @@ class RobotCommand:
     gripper_closed: bool
     action: Action = Action.NONE
     box_id: str | None = None
+    elbow_xyz: Vec3 | None = None
+    hold_position: bool = False
 
 
 @dataclass(frozen=True)
@@ -48,6 +69,7 @@ class SimStatus:
     candidate_box_id: str | None = None
     held_box_id: str | None = None
     placed_box_ids: frozenset[str] = frozenset()
+    elbow_xyz: Vec3 | None = None
 
 
 @dataclass(frozen=True)

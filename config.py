@@ -1,8 +1,7 @@
-"""Shared defaults in meters/seconds. TV3 must validate geometry with its robot.
+"""Shared Z-up meters/seconds; workspace checked with the bundled Panda robot.
 
-The initial layout is a proposal for a downward-facing tabletop arm, not a
-claim that IK has already been verified. Heights refer to the EE link origin;
-TV3 must account for its tool offset and the box attachment transform.
+Heights refer to panda_grasptarget (link 11). The virtual grasp center is
+grasp_offset meters below that link. A different robot needs new IK checks.
 """
 
 from dataclasses import dataclass
@@ -39,14 +38,38 @@ class Config:
     pinch_open: float = 0.50
     gesture_hold_s: float = 0.12
     tracking_stable_s: float = 0.30
+    resume_stable_s: float = 0.75
     sample_max_age_s: float = 0.25
     action_timeout_s: float = 1.0
     motion_timeout_s: float = 8.0
     placement_settle_s: float = 0.30
     max_control_dt: float = 0.05
     loop_hz: float = 60.0
+    camera_source: int | str = 0
+    hand_model: str = "models/hand_landmarker.task"
+    pose_model: str = "models/pose_landmarker_lite.task"
+    wrist_match_max_ratio: float = 0.12
+    # Pick mode: acquire firmly, retain across moderate confidence fluctuations.
+    pick_pose_acquire: float = 0.55
+    pick_pose_retain: float = 0.40
+    hand_side: str = "Right"
+    hand_min_palm_px: float = 15.0
+    simulation_gui: bool = True
+    grasp_offset: float = 0.05
+    candidate_distance: float = 0.04
+    control_mode: str = "pick"
+    arm_visibility: float = 0.65
+    arm_calibration_s: float = 0.6
+    arm_gain: float = 0.55
+    arm_workspace_x: tuple[float, float] = (0.20, 0.65)
+    arm_workspace_y: tuple[float, float] = (-0.35, 0.35)
+    arm_workspace_z: tuple[float, float] = (0.18, 0.65)
+    arm_reach: float = 0.70
+    arm_joint_speed: float = 1.2
 
     def __post_init__(self):
+        if not 0 < self.pick_pose_retain <= self.pick_pose_acquire <= 1:
+            raise ValueError("pose thresholds must satisfy 0 < retain <= acquire <= 1")
         if not 0 <= self.pinch_close < self.pinch_open:
             raise ValueError("pinch thresholds must have hysteresis")
         if self.max_speed <= 0 or self.loop_hz <= 0 or self.max_control_dt <= 0:

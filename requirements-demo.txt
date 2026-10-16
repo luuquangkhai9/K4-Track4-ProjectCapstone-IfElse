@@ -1,0 +1,5 @@
+# Tested Python 3.11 stack. MediaPipe already depends on opencv-contrib-python.
+mediapipe==0.10.14
+numpy==1.26.4
+opencv-contrib-python==4.10.0.84
+pybullet==3.2.7; sys_platform != 'win32'

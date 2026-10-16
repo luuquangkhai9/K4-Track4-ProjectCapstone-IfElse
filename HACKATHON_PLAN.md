@@ -2,13 +2,13 @@
 
 ## 1. Mục tiêu và phạm vi
 
-Trong 120 phút, nhóm 4 người xây dựng demo trên laptop: webcam theo dõi một bàn tay; người dùng điều khiển vị trí ngang của đầu gắp robot trong mô phỏng, chụm ngón để gắp một hộp đã chọn, di chuyển sang giỏ và mở ngón để thả.
+Trong 120 phút, nhóm 4 người xây dựng demo trên laptop gồm ba thành phần: môi trường mô phỏng 3D có một dây chuyền hàng hóa, một cánh tay robot và một giỏ; chương trình nhận diện cánh tay từ vai đến ngón tay bằng webcam; chương trình điều khiển robot từ keypoints thu được. Người dùng điều khiển vị trí ngang của đầu gắp, chụm ngón để gắp hộp, di chuyển sang giỏ và mở ngón để thả.
 
 Ngữ cảnh sản phẩm: người vận hành trạm chuyển kiện trong kho/nhà máy VinFast hoặc giải pháp Vin Robotics. Demo chứng minh tương tác điều khiển và luồng chuyển kiện trong mô phỏng. Khả năng nâng hàng nặng và cải thiện năng suất thực tế chưa được chứng minh.
 
 ### Bắt buộc hoàn thành
 
-- Một người, một tay điều khiển; hiển thị mốc bàn tay trên webcam.
+- Một người, một cánh tay điều khiển; nhận diện và hiển thị vai, khuỷu, cổ tay cùng 21 mốc bàn tay/ngón tay bằng Pose Lite + Hand Landmarker. Đây là yêu cầu bắt buộc.
 - Một robot có sẵn trong PyBullet, một trạm gắp dạng băng chuyền dừng, ba hộp có ID/màu khác nhau và một giỏ.
 - Vị trí tay trên ảnh điều khiển X–Y trên mặt bàn; hướng đầu gắp cố định xuống dưới.
 - Chụm ngón cái–trỏ để gắp, mở ngón để thả; hệ thống tự nâng/hạ.
@@ -19,7 +19,7 @@ Ngữ cảnh sản phẩm: người vận hành trạm chuyển kiện trong kho
 
 ### Bổ sung khi luồng chính đã ổn định
 
-Theo thứ tự: Pose Lite vẽ vai–khuỷu–cổ tay; thống kê độ trễ xử lý; replay lệnh; băng chuyền chạy chậm và dừng tại trạm gắp.
+Theo thứ tự: thống kê độ trễ xử lý; replay lệnh; băng chuyền chạy chậm và dừng tại trạm gắp. Cảnh 3D luôn phải có dây chuyền; chuyển động của dây chuyền là phần bổ sung, bản MVP cho dây chuyền dừng khi gắp.
 
 Không đưa vào MVP: sao chép từng góc khớp người, điều khiển độ sâu tuyệt đối từ webcam, vật lý lực kẹp/ma sát chính xác, tránh vật cản tự động, huấn luyện model, robot thật, dashboard web.
 
@@ -30,7 +30,7 @@ Thay TV1–TV4 bằng tên thật khi bắt đầu. TV1 nên là người quen t
 | Thành viên | Trách nhiệm chính | File sở hữu | Đầu ra bàn giao |
 |---|---|---|---|
 | TV1 — Tích hợp và điều khiển | Chốt giao diện module, ánh xạ tay → robot, làm mượt, máy trạng thái, chạy chương trình chính | `main.py`, `contracts.py`, `config.py`, `control.py`, `dev/run_control.py` | Điều khiển chạy độc lập bằng mẫu tay và phản hồi robot giả lập; sau đó ghép module thật |
-| TV2 — Computer vision | Webcam, MediaPipe Hand Landmarker, chọn một tay, chụm/mở, overlay; Pose Lite nếu còn giờ | `vision.py`, `models/`, `dev/run_vision.py` | Webcam + overlay chạy độc lập và xuất `HandSample` đúng hợp đồng |
+| TV2 — Computer vision | Webcam, Pose Lite + Hand Landmarker, ghép đúng cánh tay và bàn tay, xuất keypoints từ vai đến ngón tay, overlay | `vision.py`, `models/`, `dev/run_vision.py` | Webcam + overlay toàn bộ cánh tay chạy độc lập và xuất `HandSample` chứa keypoints đúng hợp đồng |
 | TV3 — Robot và mô phỏng | Cảnh, robot, IK, motor, gắn/thả hộp, giỏ, reset | `simulation.py`, `assets/` nếu cần, `dev/run_simulation.py` | Simulator chạy độc lập bằng bàn phím hoặc chuỗi lệnh cố định |
 | TV4 — Công cụ kiểm chứng và demo | Bộ dữ liệu mẫu, robot giả lập cho tích hợp, log/CSV, tổng hợp kết quả, môi trường máy demo, video | `dev/fakes.py`, `dev/run_metrics.py`, `requirements.txt`, `metrics.py`, `README_DEMO.md`, `results/`, `DEMO_SCRIPT.md` | Bộ chạy kiểm chứng độc lập, logger và báo cáo chạy ngay trên dữ liệu mẫu; sau đó dùng dữ liệu thật |
 
@@ -43,7 +43,7 @@ TV4 cũng kiểm thử trải nghiệm điều khiển bằng người dùng th�
 | Thành viên | Đầu vào thay thế khi module khác chưa có | Chạy độc lập bằng lệnh dự kiến | Việc bắt đầu ngay |
 |---|---|---|---|
 | TV1 | Vài `HandSample` và `SimStatus` tạo trực tiếp trong runner; dùng `dev/fakes.py` khi TV4 bàn giao | `python -m dev.run_control` | Mapping, giới hạn tốc độ, chuyển trạng thái; không import MediaPipe/PyBullet |
-| TV2 | Webcam trên máy của mình; không cần robot | `python -m dev.run_vision` | Nhận tay, vẽ landmark, xuất vị trí và pinch ratio |
+| TV2 | Webcam trên máy của mình; không cần robot | `python -m dev.run_vision` | Nhận vai–khuỷu–cổ tay và bàn tay, vẽ landmark, xuất keypoints |
 | TV3 | Điểm đích cố định hoặc phím điều khiển; không cần webcam | `python -m dev.run_simulation` | Dựng cảnh, IK, kiểm tra gắp/thả tại các điểm đã biết |
 | TV4 | Sự kiện/lượt thử tổng hợp có kết quả kỳ vọng; không cần webcam hoặc simulator | `python -m dev.run_metrics` | Logger, xuất CSV, báo cáo, trường hợp thành công/thất bại/reset |
 
@@ -88,14 +88,16 @@ Webcam → vision.py → HandSample → control.py → RobotCommand
 
 | Kiểu | Trường tối thiểu | Quy ước |
 |---|---|---|
-| `HandSample` | `frame_id`, `captured_at`, `processed_at`, `valid`, `u`, `v`, `pinch_ratio` | Timestamp dùng đồng hồ monotonic, giây; `u,v` là vị trí tâm lòng bàn tay chuẩn hóa trên ảnh đã lật gương; dữ liệu không hợp lệ không được điều khiển robot |
+| `HandSample` | `frame_id`, `captured_at`, `processed_at`, `valid`, `arm_side`, `arm_keypoints`, `hand_keypoints`, `pose_valid`, `hand_valid` | Tên kiểu giữ nguyên nhưng chứa toàn bộ cánh tay: `arm_keypoints` có shoulder/elbow/wrist; `hand_keypoints` có 21 mốc theo thứ tự MediaPipe. Tọa độ ảnh chuẩn hóa trên cùng ảnh lật gương; timestamp monotonic, giây |
 | `RobotCommand` | `target_xyz`, `gripper_closed` | Mét trong hệ tọa độ simulator; tư thế hướng xuống cố định trong cấu hình |
 | `SimStatus` | `ee_xyz`, `target_reached`, `candidate_box_id`, `held_box_id`, `placed_box_ids` | Phản hồi từ trạng thái thực trong mô phỏng, không suy ra chỉ từ lệnh đã gửi |
 | `TrialRecord` | `trial_id`, `operator`, `requested_box_id`, `picked_box_id`, `placed_in_bin`, `duration_s`, `failure_reason` | Hợp đồng cho TV4; ghi tất cả lượt thử, kể cả thất bại |
 
 `config.py` chứa workspace X–Y, vị trí các hộp/giỏ, độ cao vận chuyển/gắp/thả và ngưỡng cho phép gắn vật. TV1 và TV3 dùng cùng dữ liệu này để tránh tự giả định hai cảnh khác nhau. TV3 kiểm chứng giá trị thực tế và gửi cập nhật trước mốc phút 35.
 
-`pinch_ratio` = khoảng cách đầu ngón cái–trỏ / kích thước lòng bàn tay tham chiếu. Tính khoảng cách trong cùng hệ tọa độ pixel hoặc đã sửa tỉ lệ ảnh, tránh méo do dùng trực tiếp tọa độ chuẩn hóa trên ảnh không vuông. Mẫu thiếu tay hoặc kích thước tham chiếu quá nhỏ được đánh dấu không hợp lệ.
+TV2 xuất keypoints thô cùng kích thước ảnh (`image_width`, `image_height`) và chất lượng/visibility ở những trường model cung cấp. TV1 tính `u,v` của tâm lòng bàn tay và `pinch_ratio` từ keypoints trong `control.py`. `pinch_ratio` = khoảng cách đầu ngón cái–trỏ / kích thước lòng bàn tay tham chiếu. Tính khoảng cách trong cùng hệ tọa độ pixel hoặc đã sửa tỉ lệ ảnh. Mẫu thiếu tay hoặc kích thước tham chiếu quá nhỏ không được dùng để phát lệnh.
+
+Pose và hand xử lý cùng frame trong bản đầu tiên. Ghép bàn tay với cổ tay cùng bên trên ảnh; chọn một bên cố định và kiểm tra khoảng cách hai vị trí cổ tay để tránh ghép nhầm. `valid` chỉ đúng khi cả pose, hand và phép ghép hợp lệ; thiếu vai/khuỷu hoặc bàn tay phải thể hiện trên overlay và tạm dừng điều khiển. Nếu sau này chạy pose thưa hơn hand, phải thêm timestamp riêng, kiểm tra tuổi từng kết quả và không coi kết quả cũ là cùng frame mới. Không ghép trực tiếp tọa độ world của hai model vì khác gốc tọa độ.
 
 Không coi điểm phân loại tay trái/phải là độ tin cậy của toàn bộ landmark. Kết hợp kết quả phát hiện, kiểm tra dữ liệu và tuổi của mẫu để quyết định có dùng được hay không.
 
@@ -108,7 +110,7 @@ Không coi điểm phân loại tay trái/phải là độ tin cậy của toàn
 
 `RobotCommand` bổ sung `action` (`NONE`, `ATTACH`, `RELEASE`) và `box_id` tùy chọn. `control.update()` trả hành động cần thực hiện; `main.py` gửi lệnh chuyển động và gọi `try_attach`/`release` tương ứng. TV3 kiểm tra lại khoảng cách thực và tình trạng hộp; TV1 xác nhận kết quả qua `held_box_id` ở lần cập nhật kế tiếp. Không chuyển sang mang hàng chỉ vì đã phát lệnh ATTACH; các lệnh lặp không được tạo thêm liên kết hoặc đếm lại hộp. Trong runner độc lập, fake simulator cung cấp cùng phản hồi này.
 
-TV2 chỉ cung cấp pinch ratio và trạng thái tracking; TV1 sở hữu duy nhất logic xác nhận chụm/mở theo thời gian và chuyển trạng thái. TV3 sở hữu duy nhất liên kết vật lý và xác nhận hộp trong giỏ. TV4 nhận các sự kiện có `timestamp`, `event_type`, `trial_id`, `box_id`, `controller_state`, `reason` (trường không áp dụng có thể rỗng) và `TrialRecord`; không đọc biến nội bộ của các module.
+TV2 cung cấp keypoints và trạng thái tracking; TV1 sở hữu duy nhất việc trích vị trí tay/cử chỉ từ keypoints, xác nhận chụm/mở theo thời gian và chuyển trạng thái. Keypoints bàn tay điều khiển vị trí đầu gắp và gắp/thả; vai–khuỷu–cổ tay dùng để hiển thị, ghép đúng tay và kiểm tra tính hợp lệ. Không yêu cầu mỗi khớp người điều khiển một khớp robot. TV3 sở hữu duy nhất liên kết vật lý và xác nhận hộp trong giỏ. TV4 nhận các sự kiện có `timestamp`, `event_type`, `trial_id`, `box_id`, `controller_state`, `reason` (trường không áp dụng có thể rỗng) và `TrialRecord`; không đọc biến nội bộ của các module.
 
 ### Quy tắc ánh xạ
 
@@ -142,8 +144,8 @@ Mở tay ngoài giỏ không làm rơi hộp trong MVP; hiển thị yêu cầu 
 
 | Mốc | TV1 | TV2 | TV3 | TV4 | Điều kiện hoàn thành mốc |
 |---|---|---|---|---|---|
-| 0–15 | Chốt contracts/config ở phút 5; mapping chạy với mẫu cục bộ | Webcam + Hand Landmarker, runner riêng | Mở PyBullet, robot mẫu, runner điều khiển điểm đích | Môi trường máy demo, fake tối thiểu, mẫu TrialRecord | Bốn nhánh công việc khởi động độc lập; có contract và fake tối thiểu |
-| 15–35 | Lọc, máy trạng thái với fake; bàn giao vòng lặp nhận module thay thế được | HandSample thật, pinch ratio, overlay; bàn giao bản 1 | Cảnh, IK, workspace đã kiểm chứng; bàn giao bản 1 | CSV và báo cáo chạy với dữ liệu mẫu; kiểm tra hợp đồng các module | Mỗi người có kết quả chạy riêng; đủ bản 1 để ghép |
+| 0–15 | Chốt contracts/config ở phút 5; mapping chạy với mẫu keypoints cục bộ | Webcam + Pose Lite + Hand Landmarker, runner riêng | Mở PyBullet, robot mẫu, runner điều khiển điểm đích | Môi trường máy demo, fake keypoints toàn cánh tay, mẫu TrialRecord | Bốn nhánh công việc khởi động độc lập; có contract và fake tối thiểu |
+| 15–35 | Trích vị trí/cử chỉ từ keypoints, lọc, máy trạng thái với fake | Ghép pose/hand, HandSample thật, overlay vai đến ngón; bàn giao bản 1 | Cảnh, IK, workspace đã kiểm chứng; bàn giao bản 1 | CSV/báo cáo từ dữ liệu mẫu; kiểm tra đủ keypoints và hợp đồng | Mỗi người có kết quả chạy riêng; đủ bản 1 để ghép |
 | 35–60 | Ghép bản 1 camera → điều khiển → robot; pause/reset | Tự kiểm tra mất tay/nghiêng tay, sửa lỗi vision được báo | Làm attach/release bằng runner lệnh cố định, tô sáng hộp | Phút 35–40 kiểm tra bản ghép với TV1; sau đó hoàn thiện log và kịch bản đánh giá | Đầu gắp theo tay thật; gắp/thả chạy riêng trong simulator |
 | 60–85 | Ghép toàn bộ chu trình từ các module đã có | Chỉnh độ nhạy, giữ tay đã chọn, overlay trạng thái | Hoàn thiện xác nhận hộp trong giỏ, reset, sửa lỗi vật lý | Phút 60–65 kiểm tra bản ghép với TV1; ghép logger, chạy lượt thử đầu | Một chu trình thật hoàn chỉnh, có log |
 | 85–105 | Đóng băng bản ứng viên; chỉ sửa lỗi chặn demo trên bản làm việc riêng | Vận hành 5 lượt thử trên bản ứng viên, ghi ca lỗi; sau đó soạn phần giải thích vision | Kiểm tra reset/giới hạn bằng runner riêng; chuẩn bị giải thích IK | Vận hành 5 lượt còn lại, tổng hợp cả 10 lượt và ca lỗi | Có kết quả trên một phiên bản xác định; mỗi người vẫn có đầu việc riêng |
@@ -163,7 +165,7 @@ Theo đề bài, 120 phút build nằm sau 15 phút chọn hướng và trước
 
 - Phút 15: nếu cài đặt lỗi, TV4 và chủ module giải quyết ngay. Ưu tiên phiên bản Python có gói cài sẵn tương thích; tránh biên dịch thư viện trong giờ thi. Không được trì hoãn kiểm tra môi trường đến lúc tích hợp.
 - Phút 35: nếu IK chưa đến được cả trạm gắp và giỏ, giảm workspace hoặc đổi vị trí cảnh; chưa làm camera đẹp hay thêm băng chuyền động.
-- Phút 60: nếu điều khiển còn chậm, chỉ giữ Hand Landmarker; tắt Pose và giảm tần suất xử lý. Giữ frame mới nhất.
+- Phút 60: nếu điều khiển chậm, giảm độ phân giải đầu vào/tần suất xử lý và giữ frame mới nhất; vẫn phải có cả Pose Lite và Hand Landmarker. Chỉ dùng bàn tay có thể giúp chẩn đoán lỗi tạm thời nhưng không đạt yêu cầu nghiệm thu từ vai đến ngón tay.
 - Phút 85: nếu chưa hoàn tất gắp–thả, giảm còn một hộp, giữ băng chuyền dừng và dùng các điểm nâng/hạ cố định. Không cố tinh chỉnh ma sát.
 - Phút 105: không thêm tính năng. Chỉ sửa lỗi chặn demo, đo lại phần chịu ảnh hưởng và quay video.
 - Nếu demo trực tiếp hỏng: chuyển sang video đã quay và công bố rõ đó là video dự phòng.
@@ -179,6 +181,8 @@ Theo đề bài, 120 phút build nằm sau 15 phút chọn hướng và trước
 5. Hộp chỉ được tính thành công khi đã thả và nằm trong giỏ; không đếm hai lần.
 6. Che tay trong lúc di chuyển hoặc đang giữ hộp: robot tạm dừng, hộp không tự rơi; có cách phục hồi rõ ràng.
 7. Reset từ giữa chu trình xóa liên kết, trạng thái cử chỉ và bộ đếm cũ.
+8. Webcam hiển thị liên tục vai–khuỷu–cổ tay cùng các mốc ngón tay của đúng một bên; keypoints được truyền thật sang chương trình điều khiển. Che vai/khuỷu và che bàn tay là hai tình huống cần kiểm tra riêng.
+9. Cửa sổ 3D có đủ dây chuyền hàng hóa, một cánh tay robot, các hộp và một giỏ. Nói rõ dây chuyền đang dừng tại trạm gắp trong MVP.
 
 ### Bảng đo 10 lượt
 

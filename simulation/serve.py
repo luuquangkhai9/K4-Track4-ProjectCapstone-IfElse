@@ -15,7 +15,6 @@ from urllib.parse import parse_qs, urlparse
 
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
 LOCK = threading.Lock()
 LATEST = {"sequence": 0, "command": None}
 
@@ -43,10 +42,17 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        if origin and self._allowed_origin():
+            self.send_header("Access-Control-Allow-Origin", origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         super().end_headers()
+
+    def _allowed_origin(self):
+        origin = self.headers.get("Origin")
+        port = self.server.server_port
+        return origin is None or origin in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
 
     def log_message(self, fmt, *args):
         pass
@@ -60,16 +66,27 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_OPTIONS(self):
+        if not self._allowed_origin():
+            self._json(403, {"error": "cross-origin control is not allowed"})
+            return
         self.send_response(204)
         self.end_headers()
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/state":
+            bridge = getattr(self.server, "bridge", None)
+            self._json(200, bridge.snapshot() if bridge else {"active": False})
+            return
         if parsed.path == "/api/health":
             self._json(200, {"ready": True, "service": "robot-pick-cell"})
             return
         if parsed.path == "/api/command":
-            after = int(parse_qs(parsed.query).get("after", ["0"])[0])
+            try:
+                after = int(parse_qs(parsed.query).get("after", ["0"])[0])
+            except ValueError:
+                self._json(400, {"error": "after must be an integer"})
+                return
             with LOCK:
                 snapshot = dict(LATEST)
             self._json(200, {"sequence": snapshot["sequence"], "command": snapshot["command"] if snapshot["sequence"] > after else None})
@@ -78,7 +95,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         global LATEST
-        if urlparse(self.path).path != "/api/command":
+        if not self._allowed_origin():
+            self._json(403, {"error": "cross-origin control is not allowed"})
+            return
+        path = urlparse(self.path).path
+        bridge = getattr(self.server, "bridge", None)
+        if path not in ("/api/command", "/api/input"):
             self._json(404, {"error": "unknown endpoint"})
             return
         try:
@@ -88,6 +110,19 @@ class Handler(SimpleHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             if not isinstance(payload, dict):
                 raise ValueError("JSON body must be an object")
+            if path == "/api/input":
+                if bridge is None:
+                    self._json(409, {"error": "Start main.py --web for integrated control"})
+                    return
+                key = payload.get("key")
+                if key not in ("p", "c", "r", "q", "t"):
+                    raise ValueError("key must be p/c/r/q/t")
+                bridge.input(key)
+                self._json(202, {"accepted": True})
+                return
+            if bridge is not None:
+                self._json(409, {"error": "Integrated mode uses controller commands only"})
+                return
             target = finite_point(payload.get("target"))
             if target is None and isinstance(payload.get("keypoints"), dict):
                 target = finite_point(payload["keypoints"].get("wrist"))
@@ -109,7 +144,47 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(400, {"accepted": False, "error": str(exc)})
 
 
+class IntegrationBridge:
+    """Only publishes snapshots; never touches PyBullet from HTTP worker threads."""
+    def __init__(self, port=8765):
+        self._lock = threading.Lock()
+        self._state = {"active": True, "ready": False}
+        self._key = None
+        self._revision = 0
+        self.server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        self.server.daemon_threads = True
+        self.server.bridge = self
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def publish(self, state):
+        with self._lock:
+            self._revision += 1
+            self._state = dict(state, ready=True, revision=self._revision)
+
+    def snapshot(self):
+        with self._lock:
+            return dict(self._state)
+
+    def input(self, key):
+        with self._lock:
+            # Stop/reset have priority over repeated resume/start-trial clicks.
+            if self._key not in ("q", "r") or key == "q":
+                self._key = key
+
+    def poll_key(self):
+        with self._lock:
+            key, self._key = self._key, None
+            return key
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=3)
+
+
 if __name__ == "__main__":
+    PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     server.daemon_threads = True
     print(f"Robot Pick Cell sẵn sàng tại http://127.0.0.1:{PORT}")

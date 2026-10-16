@@ -6,38 +6,60 @@ Trang đề bài hackathon cuối khóa Track 4 (Computer Vision & Robotics): 2 
 
 Nội dung gồm hướng đề tài gợi ý, bốn yêu cầu của mỗi demo, bảy trụ cột Track 4, công cụ gợi ý, thang điểm, lịch trình, checklist trước demo và FAQ. Ngày giờ, địa điểm, giám khảo, giải thưởng sẽ được ban tổ chức cập nhật.
 
-## Triển khai hệ thống
-
-- `HACKATHON_PLAN.md`: phạm vi MVP, phân công, kiến trúc và tiêu chí nghiệm thu.
-- `TV1_HANDOFF.md`: giao diện tích hợp, hướng dẫn chạy và giới hạn kiểm chứng phần TV1.
-- `contracts.py`, `config.py`, `control.py`, `main.py`: hợp đồng, cấu hình, điều khiển và vòng lặp tích hợp.
-
-Chạy độc lập phần TV1 bằng Python 3.11, không cần dependency ngoài:
+## Chạy hệ thống tích hợp
 
 ```powershell
-.venv/Scripts/python.exe -m dev.run_control
-.venv/Scripts/python.exe -m unittest discover -s tests -v
+./setup-demo.ps1
+./run-demo.ps1 --mode pick --web
 ```
 
-Runner dùng dữ liệu tổng hợp. Chạy `main.py` với webcam/robot thật cần module
-`vision.py` của TV2 và `simulation.py` của TV3 theo giao diện trong tài liệu bàn giao.
+Xem `README_DEMO.md` để cài runtime, điều khiển webcam, pause/reset, ghi lượt đo
+và chạy kiểm thử. Webcam → `vision.py` → controller TV1 → PyBullet trong
+`simulation/`; cảnh Three.js hiển thị trạng thái vật lý thực. Có cả log JSONL/CSV.
 
-## TV2 — Pipeline tracking độc lập
+MVP trong `HACKATHON_PLAN.md` dùng chế độ `pick`: Pose Lite + Hand Landmarker
+nhận đủ vai–khuỷu–cổ tay và 21 điểm bàn tay trên cùng frame. Một tay điều khiển X–Y,
+chụm để gắp hộp được tô sáng, mở trong giỏ để tự hạ/thả. Mất tracking hoặc
+gián đoạn frame quá lâu sẽ PAUSED, giữ khớp và hộp; mở tay ổn định ít nhất 0,75 giây, chờ dòng `Tracking stable: tap C once to resume`
+rồi nhấn C một lần để tiếp tục. C nhấn trước khi tracking ổn định không được lưu chờ. P dừng, R reset, Q thoát.
 
-Nhánh `huyenlili-feat` bổ sung `run_holistic.py` (MediaPipe Holistic),
-`sim_env.py` (mô phỏng bàn tay PyBullet), và pipeline huấn luyện/suy luận CMU tùy chọn.
-Đây là luồng chạy riêng; chưa có `vision.py` với `Vision(config)`, `latest_sample()`
-và đầu ra `HandSample` theo hợp đồng TV1. Chưa tích hợp với `main.py` hoặc mô phỏng
-Three.js trong `simulation/`. Phần huấn luyện là thử nghiệm ngoài phạm vi MVP
-trong `HACKATHON_PLAN.md`.
+Runner độc lập cho ba phần TV1–TV3 (không cần logger TV4):
 
-Để hoàn tất bàn giao TV2 cần bổ sung một tay được chọn, tọa độ tâm lòng bàn tay
-trên ảnh gương, pinch ratio theo pixel, timestamp monotonic, mẫu invalid khi mất
-tracking, overlay và vòng đời start/close theo `TV1_HANDOFF.md`.
-`run_holistic.py --sim` giữ dữ liệu cử chỉ cũ khi mất landmark tay và vẫn cập nhật
-mô phỏng theo pose; chưa đáp ứng cơ chế PAUSED của controller TV1.
+```powershell
+.runtime/python/python.exe -m dev.run_control
+.runtime/python/python.exe -m dev.run_vision
+.runtime/python/python.exe -m dev.run_simulation --box green
+```
 
-Các hướng dẫn dưới đây dành cho pipeline độc lập do TV2 bàn giao.
+Tải/cập nhật đủ hai model bằng `.runtime/python/python.exe -m dev.download_model`
+(nếu runtime đã cài từ trước). Runner vision hiển thị webcam/landmark và in
+`HandSample` chứa keypoints thô. Cần nhìn thấy cả vai, khuỷu và bàn tay đã chọn;
+che riêng vai/khuỷu hoặc bàn tay đều gây PAUSED. Overlay hiển thị riêng trạng thái
+pose, hand và kết quả ghép cổ tay. `--hand Left` chọn tay trái. Runner simulation dùng
+chuỗi lệnh cố định, chờ phản hồi gắp/thả thật từ PyBullet rồi in PASS; thêm
+`--headless` để kiểm tra không mở GUI. Chạy tích hợp với `--no-log` nếu chỉ cần
+phần TV1–TV3. Đầu vào tổng hợp không thay thế kiểm thử người dùng với webcam.
+
+Nhận diện cả vai–khuỷu–cổ tay và cho robot di chuyển theo cánh tay:
+
+```powershell
+./run-demo.ps1 --mode arm --web
+```
+
+Giữ yên cánh tay rồi nhấn **C** để hiệu chuẩn, chờ **FOLLOWING** trước khi di chuyển.
+`--hand Left` chọn tay trái; **P** dừng, **C** hiệu chuẩn lại, **R** reset.
+
+- `HACKATHON_PLAN.md`: phạm vi và tiêu chí nghiệm thu.
+- `TV1_HANDOFF.md`: hợp đồng dữ liệu và module.
+- `./run-demo.ps1 --demo --headless --web`: kiểm tra bằng tay tổng hợp và vật lý thật.
+- `.runtime/python/python.exe -m unittest discover -s tests -v`: kiểm thử cả tích hợp.
+- `python -m dev.run_control`: runner TV1 dùng stub, chỉ cần thư viện chuẩn.
+
+## Pipeline độc lập TV2 (tham khảo)
+
+Các runner bên dưới là bản thử nghiệm ban đầu, không thay thế `main.py`.
+Huấn luyện CMU là tùy chọn ngoài MVP; cài `requirements-training.txt` nếu cần.
+Windows nên dùng runtime được `setup-demo.ps1` tạo để có PyBullet dựng sẵn.
 
 ### Chay nhanh trong VS Code
 1. Trong VS Code, **File -> Open Folder** chon thu muc goc cua repo nay.
@@ -54,7 +76,7 @@ Hoac chay tu terminal sau khi `conda activate hand-sim`:
 ```powershell
 python run_holistic.py --sim
 ```
-`setup.bat` va `setup.sh` van co the dung neu muon tao moi truong `.venv` thay vi Conda.
+Huong dan chay tich hop va runtime Windows: xem `README_DEMO.md`.
 
 ### File
 - `run_holistic.py`  : MediaPipe Holistic (canh tay + 21 keypoint moi ban tay) -> mo phong
@@ -62,7 +84,7 @@ python run_holistic.py --sim
 - `train_hand.py`    : huan luyen model tren CMU Panoptic Hand (tuy chon, can torch)
 - `run_pipeline.py`  : Pose + model CMU tu train (tuy chon, can `pip install torch torchvision`)
 - `requirements-holistic.txt` : chi can cho run_holistic.py
-- `requirements.txt` : day du, gom torch (cho train_hand / run_pipeline)
+- `requirements.txt` : dependency demo; `requirements-training.txt` gom torch tuy chon
 
 ### Loi thuong gap
 - `AttributeError: module 'mediapipe' has no attribute 'solutions'`: kiem tra da chay `conda activate hand-sim` va chon moi truong Conda `hand-sim` trong **Python: Select Interpreter**. Moi truong nay cai MediaPipe `0.10.14`; khong chay bang Python khac da cai MediaPipe phien ban moi.

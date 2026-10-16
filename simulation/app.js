@@ -3,6 +3,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var T = window.THREE;
+  var integratedState = null, integratedReceivedAt = 0;
   if (!T) {
     $("loading").innerHTML = "<span>KHÔNG TẢI ĐƯỢC THREE.JS</span><span style='font:11px sans-serif;letter-spacing:0'>Kiểm tra kết nối mạng rồi tải lại trang.</span>";
     return;
@@ -214,6 +215,14 @@
   var targetBeam = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(0, .04, 0), new T.Vector3(0, 1, 0)]), new T.LineBasicMaterial({ color: 0x6ce1d0, transparent: true, opacity: .35 }));
   targetBeam.frustumCulled = false; world.add(targetBeam);
   var lightBase = new T.PointLight(0x62dbc8, 1.7, 2.5, 2); arm.add(lightBase); lightBase.position.set(0, 1.5, .15);
+  var physicsArm = new T.Group(), physicsSegments = [], physicsJoints = [];
+  world.add(physicsArm); physicsArm.visible = false;
+  for (var segmentIndex = 0; segmentIndex < 8; segmentIndex++) {
+    var segment = new T.Mesh(new T.CylinderGeometry(.10, .13, 1, 14), mats.arm);
+    physicsArm.add(segment); physicsSegments.push(segment);
+    var joint = new T.Mesh(new T.SphereGeometry(.15, 14, 10), mats.armDark);
+    physicsArm.add(joint); physicsJoints.push(joint);
+  }
 
   // Simple labels and a virtual camera marker reinforce the perception-to-actuation flow.
   var camRig = new T.Group(); world.add(camRig); camRig.position.set(-3.95, 2.38, 1.1);
@@ -258,9 +267,10 @@
   }
 
   function updateTelemetry() {
-    $("coord-x").innerHTML = currentTarget.x.toFixed(2) + " <small>m</small>";
-    $("coord-y").innerHTML = currentTarget.y.toFixed(2) + " <small>m</small>";
-    $("coord-z").innerHTML = currentTarget.z.toFixed(2) + " <small>m</small>";
+    var xyz = integratedState ? integratedState.ee_xyz : [currentTarget.x, currentTarget.y, currentTarget.z];
+    $("coord-x").innerHTML = xyz[0].toFixed(2) + " <small>m</small>";
+    $("coord-y").innerHTML = xyz[1].toFixed(2) + " <small>m</small>";
+    $("coord-z").innerHTML = xyz[2].toFixed(2) + " <small>m</small>";
     var closed = currentGrip > .55;
     $("grip-state").textContent = closed ? "ĐÓNG" : "MỞ";
     $("grip-led").classList.toggle("closed", closed);
@@ -318,6 +328,7 @@
     });
   }
   function startDemo() {
+    if (integratedState) return;
     if (demo) return;
     resetProducts(); makeDemoSteps(); demo = { index: 0, elapsed: 0, from: currentTarget.clone(), fromGrip: currentGrip };
     $("demo-button").disabled = true;
@@ -333,6 +344,7 @@
   }
   function stopDemo() { demo = null; $("demo-button").disabled = false; }
   function resetArm() {
+    if (integratedState) { sendInput("r"); return; }
     stopDemo(); resetProducts(); commandedTarget.set(-.2, 2.08, .12); commandedGrip = 0;
     updateStatus("Đang chờ lệnh", apiOnline ? "Gửi lệnh qua API để di chuyển robot" : "Khởi động bridge để nhận lệnh", false);
   }
@@ -353,6 +365,7 @@
     updateStatus("Đã nhận lệnh", "Đang theo dõi mục tiêu đầu kẹp", true);
   }
   async function pollCommands() {
+    if (integratedState) { window.setTimeout(pollCommands, 1000); return; }
     try {
       var response = await fetch("/api/command?after=" + lastSequence, { cache: "no-store" });
       if (!response.ok) throw new Error("bridge offline");
@@ -361,7 +374,7 @@
         apiOnline = true; $("connection").textContent = "BRIDGE SẴN SÀNG"; document.querySelector(".live-dot").classList.remove("offline");
         if (!demo) updateStatus("Đang chờ lệnh", "Gửi lệnh qua API để di chuyển robot", false);
       }
-      if (body.command && body.sequence > lastSequence) { lastSequence = body.sequence; applyCommand(body.command); }
+      if (!integratedState && body.command && body.sequence > lastSequence) { lastSequence = body.sequence; applyCommand(body.command); }
     } catch (_) {
       apiOnline = false; $("connection").textContent = "BRIDGE NGOẠI TUYẾN"; document.querySelector(".live-dot").classList.add("offline");
       if (!demo) updateStatus("Chưa kết nối bridge", "Chạy python simulation/serve.py để nhận lệnh", false);
@@ -370,6 +383,90 @@
   }
   fetch("/api/health", { cache: "no-store" }).catch(function () {});
   pollCommands();
+
+  async function sendInput(key) {
+    try {
+      var response = await fetch("/api/input", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({key: key}) });
+      if (!response.ok) throw new Error("input rejected");
+    } catch (_) { showToast("Không gửi được lệnh; kiểm tra main.py --web"); }
+  }
+  async function pollState() {
+    try {
+      var response = await fetch("/api/state", {cache: "no-store"});
+      if (!response.ok) throw new Error("state unavailable");
+      var body = await response.json();
+      if (body.active && body.ready) {
+        if (!integratedState) {
+          focus.set(-.6, 1.9, -.1);
+          view.distance = 14;
+          renderer.toneMappingExposure = .8;
+          keyLight.intensity = 1.4;
+          fillLight.intensity = .6;
+        }
+        if (!integratedState || body.revision !== integratedState.revision) integratedReceivedAt = performance.now();
+        integratedState = body;
+        stopDemo();
+        $("demo-button").disabled = true;
+        $("integration-controls").hidden = false;
+        document.body.classList.add("integrated");
+        var armMode = body.control_mode === "arm";
+        $("demo-button").style.display = armMode ? "none" : "";
+        document.querySelector("h1").textContent = armMode ? "Robot theo cánh tay" : "Gắp và phân loại";
+        document.querySelector(".intro").textContent = armMode ? "Đưa vai, khuỷu và cổ tay vào webcam. Giữ yên, nhấn C để hiệu chuẩn, rồi di chuyển cánh tay." : "Trạng thái thực từ PyBullet. Điều khiển bằng tay trong webcam; cảnh này chỉ hiển thị kết quả.";
+        document.querySelector('[data-input="t"]').style.display = armMode ? "none" : "";
+      }
+    } catch (_) { /* Keep the last physics frame, never simulate missing feedback. */ }
+    window.setTimeout(pollState, 50);
+  }
+  document.querySelectorAll("[data-input]").forEach(function (button) {
+    button.addEventListener("click", function () { sendInput(button.getAttribute("data-input")); });
+  });
+  pollState();
+
+  // Display-only world transform: canonical Z-up meters -> Three.js Y-up.
+  function physicsPoint(point) {
+    return new T.Vector3((point[0] - .5) * 6 + .22, point[2] * 6 + .66,
+                         (point[1] + .18) * 6 - 1.48);
+  }
+  function mirrorPhysics() {
+    var state = integratedState;
+    currentTarget.copy(physicsPoint(state.ee_xyz));
+    commandedTarget.copy(physicsPoint(state.target_xyz));
+    currentGrip = state.held_box_id ? 1 : 0;
+    heldProduct = null;
+    var ids = ["red", "green", "blue"], colors = [0xff2626, 0x26cc33, 0x264dff];
+    products.forEach(function (product, i) {
+      var id = ids[i], point = state.boxes[id];
+      product.group.visible = !!point;
+      product.available = false;
+      if (point) product.group.position.copy(physicsPoint(point));
+      product.group.scale.setScalar(.30 / .39);
+      product.group.children[0].material.color.setHex(state.candidate_box_id === id ? 0xffff26 : colors[i]);
+      product.status = state.held_box_id === id ? "held" : "physics";
+    });
+    var bin = physicsPoint([state.bin_center[0], state.bin_center[1], 0]);
+    basket.scale.set(1.44 / bw, .36 / bh, .78 / bd);
+    basket.position.set(bin.x, .66 - .19 * .36 / bh, bin.z);
+    basketCount = state.placed_box_ids.length;
+    solveArm();
+    if (state.robot_links && state.robot_links.length === 9) {
+      // Draw the actual Panda link endpoints, including the measured elbow.
+      // The original decorative two-link IK must not invent a different posture.
+      arm.visible = false;
+      physicsArm.visible = true;
+      state.robot_links.slice(1).forEach(function (point, i) {
+        var a = physicsPoint(state.robot_links[i]), b = physicsPoint(point);
+        physicsSegments[i].visible = a.distanceTo(b) > .001;
+        if (physicsSegments[i].visible) setSegment(physicsSegments[i], a, b);
+        physicsJoints[i].position.copy(b);
+      });
+    }
+    var stale = performance.now() - integratedReceivedAt > 750;
+    $("connection").textContent = stale ? "PHYSICS NGOẠI TUYẾN" : "PYBULLET LIVE · " + (state.source === "synthetic" ? "TAY GIẢ LẬP" : "WEBCAM");
+    document.querySelector(".live-dot").classList.toggle("offline", stale);
+    updateStatus(state.controller_state, (state.vision_error || state.message) + (state.control_mode === "arm" ? "" : " | placed=" + basketCount), !stale);
+    $("state-tag").textContent = stale ? "STALE" : state.controller_state;
+  }
 
   function updateDemo(dt) {
     if (!demo) return;
@@ -416,12 +513,16 @@
   function frame() {
     requestAnimationFrame(frame);
     var dt = Math.min(clock.getDelta(), .05);
-    advanceConveyor(dt);
-    updateDemo(dt);
-    var alpha = 1 - Math.exp(-dt * 17);
-    currentTarget.lerp(commandedTarget, alpha); currentGrip += (commandedGrip - currentGrip) * (1 - Math.exp(-dt * 14));
-    solveArm(); captureProduct();
-    if (heldProduct && currentGrip < .25) releaseProduct();
+    if (integratedState) {
+      mirrorPhysics();
+    } else {
+      advanceConveyor(dt);
+      updateDemo(dt);
+      var alpha = 1 - Math.exp(-dt * 17);
+      currentTarget.lerp(commandedTarget, alpha); currentGrip += (commandedGrip - currentGrip) * (1 - Math.exp(-dt * 14));
+      solveArm(); captureProduct();
+      if (heldProduct && currentGrip < .25) releaseProduct();
+    }
     for (var i = 0; i < rollers.length; i++) rollers[i].rotation.z += dt * 2.3;
     beltTicks.forEach(function (tick) { tick.position.x += dt * .28; if (tick.position.x > .49) tick.position.x = -3.72; });
     targetDot.rotation.z += dt * .25; targetDot.material.opacity = .52 + Math.sin(performance.now() * .003) * .12;

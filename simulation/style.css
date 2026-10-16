@@ -78,6 +78,7 @@ h1 { margin:13px 0 7px; font-size:25px; font-weight:600; letter-spacing:-.04em; 
 .loading.done { opacity:0; pointer-events:none; }
 .loader { width:24px; height:24px; border:2px solid rgba(108,225,208,.2); border-top-color:var(--cyan); border-radius:50%; animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } } @keyframes pulse { 50%{opacity:.45} }
+.integrated .api-label,.integrated .api-endpoint,.integrated .api-note,.integrated .contract-toggle,.integrated .contract { display:none; }
 @media(max-width:760px) {
   .topbar { left:16px; right:16px; top:14px; }
   .top-meta { font-size:8px; gap:6px; }

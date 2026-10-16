@@ -1,0 +1,13 @@
+{
+  "completed_trials": 10,
+  "expected_trials": 10,
+  "successful_trials": 8,
+  "success_rate_completed": 0.8,
+  "wrong_box_trials": 1,
+  "median_success_duration_s": 22.0,
+  "median_sample_count": 8,
+  "operators": ["sample_operator_A", "sample_operator_B"],
+  "evaluation_complete": true,
+  "internal_goal_met": true,
+  "failure_counts": {"reset_during_tracking_loss": 1, "wrong_box": 1}
+}

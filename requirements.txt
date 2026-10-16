@@ -1,0 +1,8 @@
+# Verified on CPython 3.11.7 / Linux WSL2 in an isolated environment.
+# Full tested snapshot: results/environment/requirements-linux-python311.txt
+# Webcam, model and robot GUI await TV1–TV3 handoff on the demo machine.
+# Use a venv. Keep only one OpenCV distribution (contrib includes cv2 + GUI).
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+mediapipe==0.10.21
+pybullet==3.2.7

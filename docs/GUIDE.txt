@@ -1,0 +1,287 @@
+Tổng quan đề bài Capstone
+Về bài lab này
+Trang đề bài hackathon cuối khóa Track 4 (Computer Vision & Robotics): 2 giờ build theo team (3–5 người/đội), 10 phút demo mỗi team, đề tài gắn với hệ sinh thái Vin (VinFast, Vin Robotics, VinMec, VinUni, Vinhomes, VinBus), vận dụng tối thiểu 2 trụ cột Track 4 kèm một số đo và một ca lỗi.
+Bạn làm được gì sau bài này
+Xây dựng một demo Computer Vision hoặc Robotics chạy thật trên webcam, cảm biến hoặc sim cho một bài toán của hệ sinh thái Vin.
+Chỉ rõ và vận dụng đúng bản chất ít nhất 2 trong 7 trụ cột kiến thức của Track 4 trong hệ thống.
+Đo lường một điều có thể kiểm chứng (số đo định lượng) và phân tích một trường hợp hệ thống làm sai kèm lý do (ca lỗi).
+Đảm bảo an toàn dữ liệu: thành viên tự đóng vai, tuyệt đối không dùng dữ liệu thật của bệnh nhân hay sinh viên.
+Thực hiện quy trình làm việc nhóm chuẩn qua Git: Trưởng nhóm tạo repository, mời các thành viên vào làm việc chung; sau đó tất cả thành viên lấy repo chung tự nộp trên tài khoản VLearn cá nhân.
+Trình bày và bảo vệ sản phẩm trong 10 phút (1 phút bài toán & người dùng, 4 phút demo trực tiếp, 2 phút số đo/ca lỗi/trụ cột/impact, 3 phút hỏi đáp).
+Cần chuẩn bị
+Hoàn thành các kiến thức và kỹ năng thực hành từ Day 01 đến Day 27 của Track 4 (Computer Vision, Camera Geometry, State Estimation, Robotics, VLM).
+Kỹ năng lập trình Python, xử lý luồng video và các thư viện thị giác máy tính / mô phỏng (OpenCV, MediaPipe, YOLO, NumPy, PyBullet/MuJoCo).
+Kỹ năng làm việc nhóm trên GitHub (Tạo repo, mời Collaborators, phân chia branch, merge code).
+Chuẩn bị thiết bị: Laptop có webcam hoạt động ổn định, điện thoại (nếu dùng camera/IMU), hoặc mô phỏng (sim).
+Git & GitHub
+Python 3.10+
+OpenCV, NumPy, Ultralytics YOLO, MediaPipe
+Giao diện demo: Streamlit, Gradio hoặc cửa sổ OpenCV
+Công cụ cảm biến (nếu dùng): Physics Toolbox Sensor Suite / Sensor Logger
+Kho mã nguồn đề bài chính thức trên GitHub: https://github.com/VinUni-AI20k/K4-Track4-ProjectCapstone
+
+Trang đề bài hackathon cuối khóa Track 4 (Computer Vision & Robotics): 2 giờ build, 10 phút demo mỗi team (quy mô 3–5 người/đội), đề tài gắn với hệ sinh thái Vin.
+
+Mục tiêu cốt lõi: Xây một demo computer vision hoặc robotics chạy thật, cho một bài toán của hệ sinh thái Vin, chỉ bằng những gì đã học trong Track 4.
+Bốn con số định hình Vin Perception Hackathon
+2 giờ
+build, làm theo team (3–5 người)
+
+10 phút
+mỗi team, gồm demo và hỏi đáp
+
+≥ 2
+trụ cột kiến thức phải dùng
+
+1 + 1
+một số đo và một ca lỗi
+
+Bốn sự thật định hình buổi Hackathon (Facts)
+1. 2 giờ build, làm theo team (3–5 người/đội): Thời gian tập trung để ra một vòng end-to-end chạy sớm, sau đó mới cải thiện.
+2. 10 phút mỗi team: Bao gồm cả phần demo trực tiếp và hội đồng hỏi đáp.
+3. ≥ 2 trụ cột kiến thức phải dùng: Chỉ rõ ít nhất hai trụ cột của khóa và chúng nằm ở đâu trong hệ thống của team.
+4. 1 + 1 bằng chứng: Một số đo có thể kiểm chứng và một ca lỗi kèm lý do hệ thống làm sai.
+Minh họa hệ thống Perception mẫu (từ bản vẽ đề bài)
+Một hệ thống Perception mẫu trong giao thông thông minh:
+
+Khung hình camera (30 Hz): Phát hiện xe (car 0,91), người đi bộ (person 0,87), tính toán thời gian tới va chạm (TTC 1,8 s).
+Cảm biến IMU (gia tốc dọc): Tín hiệu gia tốc kế hiển thị hai đỉnh dao động mạnh tương ứng với hai lần xe cán qua ổ gà.
+Hợp nhất cảm biến (Sensor Fusion): Camera nhìn thấy hư hại mặt đường kết hợp IMU xác nhận độ xóc nảy cơ học.
+BẮT BUỘC: QUY ĐỊNH LÀM VIỆC NHÓM VÀ NỘP BÀI TRÊN VLEARN
+Quy mô đội thi: Mỗi đội gồm từ 3 đến 5 người. Một bạn đại diện làm Trưởng nhóm tạo repository trên GitHub, sau đó mời tất cả các bạn trong nhóm vào làm Collaborator để cùng phát triển mã nguồn.
+Tất cả thành viên đều phải tự nộp bài trên VLearn: Sau khi nhóm hoàn thiện mã nguồn trên repository chung, MỖI THÀNH VIÊN TRONG NHÓM ĐỀU PHẢI LẤY ĐƯỜNG DẪN GITHUB REPOSITORY CHUNG ĐÓ TỰ NỘP TRÊN TÀI KHOẢN VLEARN/LMS CỦA BẢN THÂN. Hệ thống VLearn quản lý điểm số theo từng tài khoản cá nhân, do đó nếu thành viên nào không nộp URL trên tài khoản của mình thì hệ thống sẽ không có bản nộp và không thể ghi nhận điểm hoàn thành khóa học cho thành viên đó.
+
+
+Chuẩn bị môi trường và Quy trình phối hợp nhóm
+Khác với các bài Lab cá nhân từ Day 01 đến Day 27, dự án Capstone Day 28 yêu cầu làm việc theo nhóm thông qua một repository Git chung.
+
+Quy trình Git nhóm và nộp bài trên VLearn cho từng thành viên
+1. Trưởng nhóm khởi tạo
+Tạo Repo GitHub (Public) & Mời tất cả thành viên vào Collaborators
+
+2. Cả nhóm cùng phát triển
+Chấp nhận lời mời, Clone repo chung, tạo branch riêng và merge vào main
+
+3. Chốt sản phẩm trên main
+Kiểm tra code, demo, video dự phòng và chốt phiên bản hoàn chỉnh
+
+4. Lấy URL Repo chung của nhóm
+https://github.com/leader/repo-name
+
+Trưởng nhóm: Tự nộp URL trên VLearn cá nhân
+
+Thành viên 1: Tự nộp URL trên VLearn cá nhân
+
+Thành viên N: Tự nộp URL trên VLearn cá nhân
+
+1. Dành cho bạn Trưởng nhóm (Team Leader)
+1. Tạo repository trên GitHub:
+Đăng nhập GitHub, nhấn New repository.
+Đặt tên repository: K4-Track4-Capstone-Team<Tên_Nhóm> (hoặc fork từ VinUni-AI20k/K4-Track4-ProjectCapstone).
+Bắt buộc chọn Public (tuyệt đối không chọn Private vì Ban giám khảo và hệ thống LMS sẽ không thể truy cập).
+Khởi tạo kèm file README.md.
+1. Mời các thành viên trong nhóm:
+Vào tab Settings của repository → chọn Collaborators ở menu bên trái.
+Nhấn nút Add people, nhập username GitHub của từng thành viên trong nhóm để gửi lời mời.
+1. Cung cấp đường dẫn cho nhóm:
+Gửi đường dẫn repository cho các bạn trong nhóm để cùng clone và làm việc.
+2. Dành cho các thành viên trong nhóm
+1. Chấp nhận lời mời:
+Mở email hoặc thông báo GitHub, nhấn Accept invitation để nhận quyền ghi vào repo chung.
+1. Clone mã nguồn về máy cá nhân:
+git clone https://github.com/<leader-username>/<repo-name>.git
+cd <repo-name>
+Chép
+1. Thiết lập môi trường làm việc:
+Cài đặt môi trường Python
+Windows (PowerShell)
+macOS / Linux (Bash)
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install --upgrade pip
+   pip install opencv-python ultralytics mediapipe streamlit gradio numpy filterpy
+Chép
+1. Phân chia nhánh làm việc (Branching):
+Mỗi thành viên tạo branch riêng theo nhiệm vụ:
+git checkout -b feature/<tên-nhiệm-vụ>
+# Viết code và commit
+git add -A
+git commit -m "feat: bổ sung module phát hiện"
+git push origin feature/<tên-nhiệm-vụ>
+Chép
+Trưởng nhóm kiểm tra và merge vào nhánh main.
+3. Quy trình nộp bài trên VLearn cho từng người (Cực kỳ quan trọng)
+LƯU Ý SỐNG CÒN KHI NỘP BÀI
+Khi buổi build kết thúc:
+
+Trưởng nhóm copy đường dẫn repository chung (ví dụ: https://github.com/leader/K4-Track4-Capstone-TeamVinPerception).
+Gửi link này cho tất cả thành viên trong nhóm.
+TỪNG BẠN (CẢ TRƯỞNG NHÓM VÀ TOÀN BỘ THÀNH VIÊN) ĐĂNG NHẬP VÀO VLEARN CỦA MÌNH, VÀO MỤC BÀI NỘP DAY 28, DÁN ĐÚNG ĐƯỜNG DẪN REPO CHUNG ĐÓ VÀ BẤM NỘP.
+Ghi rõ trong phần ghi chú: Team <Tên_Nhóm>, Trưởng nhóm: <Tên_Trưởng_Nhóm>, Vai trò cá nhân: <Nhiệm_vụ>.
+
+Đề tài: Chọn một bài toán gắn với Vin
+Tự chọn bài toán cụ thể, miễn có camera, cảm biến hoặc robot và gắn với một đơn vị trong hệ sinh thái Vin. Dưới đây là các hướng gợi ý từ đề bài:
+
+Đơn vị Vin	Hướng bài toán gợi ý	Ví dụ thực tế có thể làm demo
+VinFast	Camera và cảm biến trong xe, hỗ trợ lái, giám sát tài xế, sạc xe điện.	Nhận diện tài xế buồn ngủ (EAR qua MediaPipe Face Mesh); ước lượng góc nghiêng đầu 3D (solvePnP); cảnh báo va chạm trước (TTC); nhận diện ổ gà kết hợp IMU; căn lề trạm sạc ArUco.
+Vin Robotics	Robot di động, cánh tay robot, cảm biến, mô phỏng.	Robot di động (AMR) tránh chướng ngại vật; cánh tay robot gắp phân loại linh kiện (Pick and Place); bám theo người vận hành; mô phỏng trong PyBullet hoặc MuJoCo.
+VinMec	Giám sát an toàn bằng camera, robot hỗ trợ trong bệnh viện.	Phát hiện té ngã cho bệnh nhân cao tuổi (MediaPipe Pose); đo góc khớp phục hồi chức năng sau mổ; robot hỗ trợ vận chuyển đồ trong hành lang bệnh viện.
+VinUni	Camera và cảm biến trong khuôn viên, thể thao, phòng lab.	Phân tích tư thế vận động thể thao (ném bóng rổ, cầu lông, nâng tạ); giám sát an toàn phòng lab (kính bảo hộ, áo blouse); đếm người ra vào thư viện.
+Khác	Vinhomes, VinBus hoặc một đơn vị Vin khác.	Đếm hành khách lên xuống xe VinBus theo hướng di chuyển; giám sát an toàn cửa xe bus; kiểm soát an ninh khu đô thị Vinhomes.
+
+
+
+Yêu cầu: Bốn điều mỗi demo phải có
+Ngoài bốn điều này, cách làm hoàn toàn tự do:
+
+1. Chạy thật
+Demo trực tiếp trên webcam, cảm biến hoặc sim. Mang theo một video quay sẵn để dự phòng khi demo hỏng.
+
+2. Dùng kiến thức của khóa
+Chỉ rõ ít nhất 2 trụ cột bên dưới và chúng nằm ở đâu trong hệ thống của team.
+
+3. Một số đo, một ca lỗi
+Đo một điều có thể kiểm chứng. Cho xem một trường hợp hệ thống làm sai, kèm lý do.
+
+4. Dữ liệu an toàn
+Thành viên đội tự đóng vai. Không dùng dữ liệu thật của bệnh nhân hay sinh viên.
+
+Bảy trụ cột của Track 4
+Chọn ít nhất hai trụ cột. Dưới đây là mô tả chi tiết từng trụ cột và ví dụ thể hiện trong demo:
+
+Bảy trụ cột kiến thức của Track 4
+1. HỌC
+Model nhận ra gì, học từ dữ liệu nào
+
+2. HÌNH HỌC
+Hiệu chuẩn camera, đổi hệ tọa độ, khoảng cách
+
+3. BẤT ĐỊNH
+Nhiễu cảm biến, độ tin cậy, khi nào nghi ngờ
+
+4. BIỂU DIỄN
+Mã hóa thành box, mốc khớp, điểm, trạng thái
+
+5. THỜI GIAN
+Đồng bộ cảm biến, tần số, độ trễ từ ảnh đến quyết định
+
+6. DỮ LIỆU
+Log, replay, nhãn, chất lượng dữ liệu đầu vào
+
+7. BẰNG CHỨNG
+Số đo, ca lỗi, giới hạn của những gì đã chứng minh
+
+1. Học: Model nhận ra gì, và nó đã học từ dữ liệu nào.
+Trong demo: Sử dụng YOLOv8/v11 để phát hiện vật thể, MediaPipe trích xuất mốc cơ thể, hoặc VLM mô tả cảnh.
+1. Hình học: Hiệu chuẩn camera, đổi hệ tọa độ, ước lượng khoảng cách.
+Trong demo: Tính góc xoay đầu 3D qua cv2.solvePnP; ước lượng khoảng cách theo tiêu cự camera; nhận diện marker ArUco.
+1. Bất định: Nhiễu cảm biến, độ tin cậy của đầu ra, khi nào nên nghi ngờ.
+Trong demo: Cấu hình ngưỡng confidence; lọc nhiễu tín hiệu gia tốc kế; phát cảnh báo "không chắc chắn" khi camera ngược sáng hoặc bị rung.
+1. Biểu diễn: Thế giới được mã hóa thành box, mốc khớp, điểm hay trạng thái.
+Trong demo: Biểu diễn tài xế bằng 468 mốc khuôn mặt; biểu diễn chuyển động bằng vector trạng thái [x, y, vx, vy].
+1. Thời gian: Đồng bộ cảm biến, tần số, độ trễ từ ảnh đến quyết định.
+Trong demo: Bộ lọc Kalman filter làm mượt tọa độ và dự đoán khi bị che khuất; đồng bộ camera 30 Hz với IMU 100 Hz; đo độ trễ pipeline end-to-end.
+1. Dữ liệu: Log, replay, nhãn, chất lượng dữ liệu đầu vào.
+Trong demo: Ghi log cảm biến ra CSV; phát lại (replay) video test clip; kiểm thử trên các điều kiện ánh sáng khác nhau.
+1. Bằng chứng: Số đo, ca lỗi, và giới hạn của những gì đã chứng minh.
+Trong demo: Biểu đồ FPS thực tế; phân tích nguyên nhân ca lỗi khi tài xế đeo kính râm hoặc quay mặt quá 60 độ; nêu rõ giới hạn khoảng cách hoạt động (0.5m – 2m).
+
+Công cụ: Gợi ý để bắt đầu nhanh
+Hai giờ không đủ để train model từ đầu, nên model pretrained là lựa chọn hợp lý. Dùng công cụ nào là quyền của team:
+
+Đầu vào: Webcam laptop. Camera và IMU của điện thoại (app ghi cảm biến, xuất CSV như Physics Toolbox Sensor Suite hoặc Sensor Logger). Video dashcam hoặc hành lang. Sim như PyBullet hoặc MuJoCo.
+Model có sẵn: Phát hiện vật (YOLO), tư thế và mốc khuôn mặt (MediaPipe), phân đoạn, VLM mô tả cảnh.
+Hình học và hợp nhất: OpenCV, marker ArUco, hiệu chuẩn camera. Kalman filter bằng NumPy.
+Giao diện demo: Cửa sổ OpenCV, Streamlit hoặc Gradio. Chọn thứ chạy ổn trên máy sẽ dùng để demo.
+
+Chấm điểm: Sáu tiêu chí, tổng 100 điểm
+Mỗi giám khảo chấm độc lập từng tiêu chí theo ba mức, rồi lấy trung bình. Hai tiêu chí đầu chiếm một nửa tổng điểm: sản phẩm phải dùng kiến thức của khóa và phải chạy được.
+
+Bảng 6 tiêu chí chi tiết
+1. Vận dụng kiến thức đã học (25 điểm)
+Sản phẩm này có làm được không nếu chưa học Track 4?
+Xuất sắc (20–25): Dùng từ hai trụ cột trở lên một cách đúng bản chất, chỉ ra chúng nằm ở đâu trong hệ thống và giải thích vì sao chọn cách đó thay vì phương án khác.
+Khá (13–19): Có dùng hai trụ cột nhưng ở mức áp dụng công thức hoặc thư viện, ít giải thích lựa chọn.
+Cần cải thiện (0–12): Chủ yếu gọi model có sẵn. Kiến thức của khóa không thể hiện trong cách thiết kế.
+2. Demo chạy được (25 điểm)
+Có thấy hệ thống chạy trên đầu vào thật không?
+Xuất sắc (20–25): Chạy trực tiếp trên webcam, cảm biến hoặc sim, ổn định, và xử lý được một đầu vào do giám khảo đưa ra tại chỗ.
+Khá (13–19): Chạy được nhưng cần kịch bản cố định, hoặc phải chuyển sang video một lúc.
+Cần cải thiện (0–12): Chủ yếu là video, ảnh chụp hoặc dữ liệu giả. Hoặc hỏng giữa chừng và không phục hồi được.
+3. Độ hữu ích (15 điểm)
+Ai sẽ dùng nó vào ngày mai, và họ được gì?
+Xuất sắc (12–15): Người dùng và nỗi đau rất cụ thể, gắn với một đơn vị Vin. Kết quả dùng được ngay mà không cần người giải thích.
+Khá (8–11): Bài toán rõ nhưng người dùng hoặc cách dùng còn chung chung.
+Cần cải thiện (0–7): Là một demo kỹ thuật. Khó nói được ai cần và để làm gì.
+4. Impact (15 điểm)
+Nếu triển khai ở Vin thì thay đổi được điều gì, ở quy mô nào?
+Xuất sắc (12–15): Ước lượng được tác động bằng con số (an toàn, thời gian, chi phí, số người), nêu đường mở rộng và rủi ro khi đưa vào thực tế.
+Khá (8–11): Nêu được tác động nhưng chưa có con số, hoặc chưa nói tới mở rộng.
+Cần cải thiện (0–7): Chỉ nói chung chung rằng sản phẩm hữu ích hoặc tiềm năng.
+5. Bằng chứng (10 điểm)
+Dựa vào đâu để tin kết quả này?
+Xuất sắc (8–10): Có số đo kiểm chứng được, ít nhất một ca lỗi được phân tích nguyên nhân, và nói rõ giới hạn của những gì đã chứng minh.
+Khá (5–7): Có số đo nhưng ca lỗi chưa được giải thích, hoặc chưa nêu giới hạn.
+Cần cải thiện (0–4): Không có số đo. Kết luận chỉ dựa trên cảm giác là nó chạy đúng.
+6. Trình bày và hỏi đáp (10 điểm)
+Cả team có kể rõ và trả lời được không?
+Xuất sắc (8–10): Kể mạch lạc trong 10 phút, đúng giờ. Mọi thành viên trả lời được câu hỏi về phần của mình và của cả hệ thống.
+Khá (5–7): Rõ ý nhưng có thành viên không trả lời được, hoặc quá giờ.
+Cần cải thiện (0–4): Khó theo dõi, không trả lời được câu hỏi của hội đồng.
+Gợi ý chia 10 phút demo
+Phân bổ 10 phút thuyết trình và phản biện
+1 phút
+Bài toán Vin và người dùng là ai
+
+4 phút
+Demo trực tiếp, cho xem hệ thống chạy
+
+2 phút
+Một số đo, một ca lỗi, trụ cột đã dùng & tác động ước lượng
+
+3 phút
+Hội đồng hỏi đáp (Mọi thành viên có thể được hỏi)
+
+1 phút: Bài toán Vin và người dùng là ai.
+4 phút: Demo trực tiếp, cho xem hệ thống chạy.
+2 phút: Một số đo, một ca lỗi, trụ cột đã dùng và tác động ước lượng.
+3 phút: Hội đồng hỏi đáp. Mọi thành viên có thể được hỏi.
+Khi hai team bằng điểm
+Trước: Team có điểm Demo chạy được cao hơn.
+Sau: Team có điểm Bằng chứng cao hơn.
+
+
+Lịch trình: Một buổi, từ phát đề đến công bố
+Mốc thời gian tính từ lúc bắt đầu. Giờ thực tế do ban tổ chức thông báo:
+
+Mốc thời gian	Giai đoạn	Nội dung hoạt động chi tiết
+0:00	Phát đề, chọn hướng	15 phút. Mỗi team (3–5 người) chốt bài toán và phân vai. Trưởng nhóm tạo repo GitHub, mời các bạn vào repo.
+0:15	Build	120 phút. Mục tiêu là một vòng end-to-end chạy sớm, rồi mới cải thiện.
+1:15 (Mốc then chốt)	Mốc kiểm tra	Giảng viên đi qua từng team. Cần có thứ gì đó chạy từ đầu vào đến đầu ra, dù thô.
+2:15	Dừng code, chuẩn bị demo	15 phút. Quay video dự phòng, chốt số đo và ca lỗi. Tất cả thành viên nộp link repo chung lên VLearn cá nhân.
+2:30	Demo	10 đến 12 team, mỗi team tối đa 10 phút.
+Cuối buổi	Chấm điểm và công bố	Ban giám khảo tổng hợp theo thang điểm ở trên và công bố giải thưởng.
+
+Checklist: Trước khi lên demo
+Tích để tự kiểm tra trước khi lên bục demo:
+
+Checklist 9 mục trước khi lên Demo0/9
+
+1. Demo chạy trên đúng máy sẽ dùng, đã thử webcam hoặc cảm biến ở phòng demo.
+
+2. Có video quay sẵn để dự phòng nếu demo trực tiếp hỏng.
+
+3. Có một con số đo, và cả team nói được nó đo như thế nào.
+
+4. Có ít nhất một ca lỗi, kèm lý do vì sao hệ thống sai.
+
+5. Chỉ ra được ít nhất 2 trụ cột và vị trí của chúng trong hệ thống.
+
+6. Không dùng dữ liệu thật của bệnh nhân hoặc sinh viên.
+
+7. Mỗi thành viên trả lời được vì sao team chọn cách làm này.
+
+8. Nói được người dùng là ai và họ được gì khi dùng sản phẩm.
+
+9. Có một ước lượng tác động nếu triển khai ở Vin, dù chỉ là phép tính đơn giản.
+

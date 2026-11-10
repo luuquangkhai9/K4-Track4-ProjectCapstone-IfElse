@@ -162,6 +162,7 @@ class ArmHandFusion:
             for s in self.sides
         }
         self.matched: dict[str, HandDetection] = {}  # tay đã ghép ở frame gần nhất (để vẽ overlay)
+        self.status: dict[str, str] = {s: "" for s in self.sides}  # lý do valid/invalid (ASCII cho OpenCV)
 
     def _origin(self, pose_world: np.ndarray) -> np.ndarray | dict[str, np.ndarray]:
         if len(self.sides) == 2:
@@ -207,6 +208,15 @@ class ArmHandFusion:
 
             pose_ok = det.pose_world is not None and det.pose_visibility is not None and \
                 float(det.pose_visibility[list(POSE_IDX[s])].min()) >= self.min_visibility
+            # Lý do trạng thái, hiện trên cửa sổ webcam để biết vì sao mất tay
+            if det.pose_world is None:
+                self.status[s] = "khong thay nguoi"
+            elif not pose_ok:
+                self.status[s] = "vai/khuyu/co tay bi mo"
+            elif s not in self.matched:
+                self.status[s] = "khong thay ban tay"
+            else:
+                self.status[s] = "OK"
             if pose_ok:
                 arm = det.pose_world[list(POSE_IDX[s])] - origins[s]  # đổi gốc về vai
                 vis = float(det.pose_visibility[list(POSE_IDX[s])].min())

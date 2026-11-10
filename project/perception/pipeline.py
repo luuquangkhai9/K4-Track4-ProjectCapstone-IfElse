@@ -149,9 +149,12 @@ class CameraPerceptionThread(threading.Thread):
                 draw_overlay(frame, det, fusion)
                 if disp_cfg.get("mirror", True):
                     frame = cv2.flip(frame, 1)  # chỉ lật để HIỂN THỊ như gương, dữ liệu 3D không đổi
-                status = "  ".join(f"{s}:{'OK' if f.valid else '--'}" for s, f in frames.items())
-                cv2.putText(frame, f"Perception FPS: {fps:5.1f}   {status}", (10, 30),
+                cv2.putText(frame, f"Perception FPS: {fps:5.1f}", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
+                for i, (s, f) in enumerate(frames.items()):
+                    color = (0, 255, 0) if f.valid else (0, 0, 255)
+                    cv2.putText(frame, f"{s}: {'OK' if f.valid else 'MAT'} - {fusion.status.get(s, '')}",
+                                (10, 60 + 28 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2, cv2.LINE_AA)
                 self.buffer.put(PerceptionOutput(frames=frames, fps=fps, image=frame))
         except BaseException as exc:  # báo lỗi cho luồng chính
             self.error = exc

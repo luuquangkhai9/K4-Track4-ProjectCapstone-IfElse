@@ -124,9 +124,12 @@ class ArmScene:
                                physicsClientId=self.world.cid)
 
     def update(self, frames: dict[str, ArmHandFrame], fps: float) -> None:
-        for s, f in frames.items():
-            if s in self.arms:
-                self.arms[s].update(f)
+        try:
+            for s, f in frames.items():
+                if s in self.arms:
+                    self.arms[s].update(f)
+        except p.error:  # cửa sổ vừa bị đóng; step_and_handle_keys sẽ báo thoát
+            return
         self._last_frames, self._fps = frames, fps
 
     def _update_texts(self) -> None:
@@ -155,9 +158,13 @@ class ArmScene:
 
     def step_and_handle_keys(self) -> bool:
         """Bước vật lý + xử lý phím. Trả về False nếu người dùng muốn thoát."""
-        self.world.step(self.substeps)
-        self._update_texts()
-        for key, state in self.world.keys().items():
+        try:
+            self.world.step(self.substeps)
+            self._update_texts()
+            keys = self.world.keys()
+        except p.error:  # người dùng đóng cửa sổ PyBullet giữa vòng lặp
+            return False
+        for key, state in keys.items():
             if not state & p.KEY_WAS_TRIGGERED:
                 continue
             if key in (ord("q"), 27):

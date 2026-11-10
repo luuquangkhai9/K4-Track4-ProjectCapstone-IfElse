@@ -150,6 +150,9 @@ nhìn từ sau lưng, nên mô hình chuyển động giống như bạn soi gư
 
 - Ánh sáng tốt, đều, tránh ngược sáng (cửa sổ sau lưng).
 - Đứng/ngồi cách camera **1–2 m**, để **cả vai** (và tốt nhất cả nửa thân trên) lọt khung hình.
+  Ngồi quá gần, MediaPipe đoán sai và dời mọi khớp đi một bậc (khuỷu bị gán thành vai...);
+  chương trình phát hiện trường hợp này và báo `lui ra xa` trên cửa sổ webcam
+  (tham số `perception.frame_margin`, `perception.min_forearm_ratio`).
 - Mặc **áo tay ngắn** hoặc xắn tay áo để khuỷu và cổ tay rõ ràng.
 - Phông nền đơn giản, không có người khác trong khung hình.
 - Giữ tay yên ~1 giây lúc đầu để bước đo độ dài xương lấy được số liệu ổn định.

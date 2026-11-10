@@ -18,6 +18,8 @@ perception:
   min_tracking_confidence: 0.3
   min_visibility: 0.3    # visibility tối thiểu của vai/khuỷu/cổ tay trong pose
   hand_match_max_dist: 0.25  # khoảng cách tối đa (tọa độ ảnh chuẩn hoá) giữa cổ tay pose và cổ tay hand
+  frame_margin: 0.0      # vai/khuỷu/cổ tay được phép ra ngoài mép ảnh bao nhiêu (tọa độ chuẩn hoá)
+  min_forearm_ratio: 1.0 # cẳng tay trên ảnh phải dài >= hệ số này x (cổ tay -> gốc ngón giữa); 0 = tắt
   hold_time: 0.5         # giây giữ giá trị cuối khi mất dấu trước khi đánh dấu invalid
 
 filter:                  # One Euro Filter (vị trí tính bằng mét)

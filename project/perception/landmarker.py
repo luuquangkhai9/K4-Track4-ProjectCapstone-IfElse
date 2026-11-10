@@ -55,6 +55,7 @@ class RawDetection:
     pose_image: np.ndarray | None = None       # (33, 3) chuẩn hoá trên ảnh
     pose_visibility: np.ndarray | None = None  # (33,)
     hands: list[HandDetection] = field(default_factory=list)
+    aspect: float = 4 / 3                      # rộng / cao của ảnh (để đo độ dài trên ảnh đúng tỉ lệ)
 
 
 def _to_array(landmarks) -> np.ndarray:
@@ -103,7 +104,7 @@ class Landmarker:
         ts_ms = max(int(timestamp * 1000), self._last_ts_ms + 1)
         self._last_ts_ms = ts_ms
 
-        out = RawDetection(timestamp=timestamp)
+        out = RawDetection(timestamp=timestamp, aspect=frame_bgr.shape[1] / frame_bgr.shape[0])
         pose_res = self._pose.detect_for_video(image, ts_ms)
         if pose_res.pose_world_landmarks:
             out.pose_world = _to_array(pose_res.pose_world_landmarks[0])

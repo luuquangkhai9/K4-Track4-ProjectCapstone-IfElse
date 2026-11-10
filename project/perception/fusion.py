@@ -156,6 +156,8 @@ class ArmHandFusion:
         self.hold_time = float(perception_cfg.get("hold_time", 0.5))
         self.min_visibility = float(perception_cfg.get("min_visibility", 0.5))
         self.match_max_dist = float(perception_cfg.get("hand_match_max_dist", 0.15))
+        self.frame_margin = float(perception_cfg.get("frame_margin", 0.0))
+        self.min_forearm_ratio = float(perception_cfg.get("min_forearm_ratio", 1.0))
         self._states = {
             s: _SideState(OneEuroFilter(filter_cfg.get("min_cutoff", 1.0), filter_cfg.get("beta", 4.0),
                                         filter_cfg.get("d_cutoff", 1.0)))
@@ -194,6 +196,29 @@ class ArmHandFusion:
                 used.add(i)
         return result
 
+    def _arm_problem(self, det: RawDetection, side: str) -> str | None:
+        """Kiểm tra hình học trên ảnh để loại tư thế pose bị lệch khớp.
+
+        Khi người ngồi quá gần, vai ra ngoài khung hình và PoseLandmarker thường dời mọi
+        khớp đi một bậc (khuỷu thật bị gán thành vai, cổ tay thật thành khuỷu...) mà
+        visibility vẫn cao. Hai dấu hiệu:
+        1. Vai/khuỷu/cổ tay nằm ngoài (hoặc sát mép) khung hình.
+        2. Cẳng tay trên ảnh ngắn bất thường so với bàn tay. Thật ra cẳng tay dài ~2.7 lần
+           đoạn cổ tay -> khớp gốc ngón giữa; cho phép co ngắn do phối cảnh tới `min_forearm_ratio`.
+        """
+        img = det.pose_image[list(POSE_IDX[side]), :2]
+        m = self.frame_margin
+        if np.any(img < -m) or np.any(img > 1 + m):
+            return "vai/khuyu ngoai khung - lui ra xa"
+        hand = self.matched.get(side)
+        if hand is not None and self.min_forearm_ratio > 0:
+            scale = np.array([det.aspect, 1.0])  # đổi tọa độ chuẩn hoá về cùng đơn vị theo x và y
+            forearm = np.linalg.norm((img[2] - img[1]) * scale)
+            palm = np.linalg.norm((hand.image[9, :2] - hand.image[0, :2]) * scale)
+            if palm > 1e-6 and forearm / palm < self.min_forearm_ratio:
+                return "khop tay bi lech - lui ra xa"
+        return None
+
     def update(self, det: RawDetection) -> dict[str, ArmHandFrame]:
         t = det.timestamp
         self.matched = self._match_hands(det)
@@ -208,11 +233,15 @@ class ArmHandFusion:
 
             pose_ok = det.pose_world is not None and det.pose_visibility is not None and \
                 float(det.pose_visibility[list(POSE_IDX[s])].min()) >= self.min_visibility
+            problem = self._arm_problem(det, s) if pose_ok else None
             # Lý do trạng thái, hiện trên cửa sổ webcam để biết vì sao mất tay
             if det.pose_world is None:
                 self.status[s] = "khong thay nguoi"
             elif not pose_ok:
                 self.status[s] = "vai/khuyu/co tay bi mo"
+            elif problem is not None:
+                self.status[s] = problem
+                pose_ok = False  # tư thế sai hình học: coi như mất pose (giữ giá trị cuối rồi invalid)
             elif s not in self.matched:
                 self.status[s] = "khong thay ban tay"
             else:

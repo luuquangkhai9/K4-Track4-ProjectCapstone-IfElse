@@ -16,7 +16,14 @@ from sim.transforms import R_MP_TO_SIM, mp_to_sim, quat_z_to, sim_to_mp  # noqa:
 HIP_TO_SHOULDER = {"left": np.array([0.18, -0.5, 0.0]), "right": np.array([-0.18, -0.5, 0.0])}
 
 
-def fake_detection(t: float, sides=("right",), with_hands=True, hand_label_wrong=False, with_pose=True) -> RawDetection:
+def project(p: np.ndarray) -> np.ndarray:
+    """Phép chiếu giả lên ảnh (có tính độ sâu để cẳng tay hướng về camera không bị co về 0)."""
+    p = np.atleast_2d(p)
+    return np.c_[p[:, 0] + 0.3 * p[:, 2], p[:, 1] + 0.3 * p[:, 2], np.zeros(len(p))]
+
+
+def fake_detection(t: float, sides=("right",), with_hands=True, hand_label_wrong=False, with_pose=True,
+                   too_close=False) -> RawDetection:
     """Dựng RawDetection giả: pose gốc ở hông, hand gốc ở tâm bàn tay (như MediaPipe)."""
     det = RawDetection(timestamp=t)
     if with_pose:
@@ -25,15 +32,22 @@ def fake_detection(t: float, sides=("right",), with_hands=True, hand_label_wrong
         det.pose_visibility = np.ones(33)
         for s in ("left", "right"):
             pts = canonical_points(s) + HIP_TO_SHOULDER[s]
+            img = 0.5 + project(pts)
+            img[:, 2] = 0
+            if too_close:
+                # Ngồi quá gần: pose dời mỗi khớp đi một bậc (vai <- khuỷu, khuỷu <- cổ tay,
+                # cổ tay <- giữa mu bàn tay), như quan sát thực tế khi vai ra ngoài khung
+                img = np.vstack([img[1], img[2], 0.5 * (img[2] + img[HAND_OFFSET + 9])])
             for k, idx in enumerate(POSE_IDX[s]):
                 det.pose_world[idx] = pts[k]
-                det.pose_image[idx] = [0.5 + pts[k][0], 0.5 + pts[k][1], 0]  # "chiếu" đơn giản
+                det.pose_image[idx] = img[k]
     if with_hands:
         for s in sides:
             hand = canonical_points(s)[HAND_OFFSET:]
             world = hand - hand.mean(axis=0)  # gốc quanh tâm bàn tay
-            wrist_img = det.pose_image[POSE_IDX[s][2]] if with_pose else np.array([0.5, 0.5, 0])
-            image = np.tile(wrist_img, (21, 1)) + np.c_[world[:, :2], np.zeros(21)]
+            pts = canonical_points(s) + HIP_TO_SHOULDER[s]
+            image = 0.5 + project(pts[HAND_OFFSET:])
+            image[:, 2] = 0
             label = s if not hand_label_wrong else ("left" if s == "right" else "right")
             det.hands.append(HandDetection(side=label, score=0.9, world=world, image=image))
     return det
@@ -74,6 +88,14 @@ def test_fusion_matches_by_position_even_if_label_wrong() -> None:
     assert np.allclose(frames["left"].hand[0], frames["left"].wrist)
     # Gốc ở trung điểm hai vai -> hai vai đối xứng
     assert np.allclose(frames["left"].shoulder, -frames["right"].shoulder)
+
+
+def test_rejects_shifted_joints_when_too_close() -> None:
+    fu = ArmHandFusion({"hands": "right", "hold_time": 0.5, "hand_match_max_dist": 0.3}, {})
+    assert fu.update(fake_detection(0.0))["right"].valid
+    fu.update(fake_detection(0.1, too_close=True))
+    assert "lui ra xa" in fu.status["right"]
+    assert not fu.update(fake_detection(0.7, too_close=True))["right"].valid
 
 
 def test_hold_then_invalid() -> None:
